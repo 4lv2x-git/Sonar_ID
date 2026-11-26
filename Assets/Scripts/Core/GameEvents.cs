@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 using UnityEngine.InputSystem;
 using SonarCrew.Multiplayer;
 using SonarCrew.Stations;
@@ -17,6 +18,32 @@ namespace SonarCrew.Core
 
         public static event Action<IStation, CrewController> StationOccupied;
         public static event Action<IStation, CrewController> StationReleased;
+
+        /// <summary>Colisión del casco: impulso, punto de contacto, sala y severidad (hito 5).</summary>
+        public static event Action<float, Vector3, HullZone, DamageLevel> HullImpacted;
+        public static event Action<HullZone> LeakOpened;
+        public static event Action<HullZone> LeakClosed;
+        public static event Action AlarmRaised;
+
+        public static void RaiseHullImpacted(float impulse, Vector3 point, HullZone zone, DamageLevel level)
+        {
+            HullImpacted?.Invoke(impulse, point, zone, level);
+        }
+
+        public static void RaiseLeakOpened(HullZone zone)
+        {
+            LeakOpened?.Invoke(zone);
+        }
+
+        public static void RaiseLeakClosed(HullZone zone)
+        {
+            LeakClosed?.Invoke(zone);
+        }
+
+        public static void RaiseAlarm()
+        {
+            AlarmRaised?.Invoke();
+        }
 
         public static void RaisePlayerDeviceAssigned(int slot, Gamepad pad)
         {

@@ -1,7 +1,7 @@
 # trabajo.md — Reparto de trabajo por hitos
 
 Documento operativo para dos personas (o dos agentes) trabajando en paralelo sobre Sonar Submarine Crew.
-Última actualización: 2026-11-25.
+Última actualización: 2026-11-26.
 
 - `README.md` es la especificación de producto.
 - `AGENTS.md` contiene las decisiones técnicas, la arquitectura y los hitos oficiales (0–7).
@@ -29,7 +29,7 @@ Reglas de convivencia:
 | Hito | Persona | Estado | Nota |
 |---|---|---|---|
 | 0 — Base | A + B | Hecho (`260f1aa`) | `Bootstrap` con 4 slots, cámaras divididas, tripulante y casco estático |
-| 1 — Submarino | A | En curso (sin commit) | `SubmarineMotor` + `SubmarineMotorConfig` + `PowerStateStub`; faltan proxy, `SubmarineFrame`, `ISubmarinePose` y `WorldRoot` |
+| 1 — Submarino | A | Hecho | `SubmarineProxy`, `SubmarineFrame`, `ISubmarinePose`, rebase, confines y sonda en coordenadas de mapa; herramienta de Editor de montaje |
 | 2 — Estaciones y salas | B | Pendiente | Ya existen `IStation` y la ocupación básica en `CrewController`; faltan `StationBase`, `PowerSystem` y las cinco salas |
 | 3 — Navegación | A | Pendiente | |
 | 4 — Objetivo | B | Pendiente | |
@@ -53,10 +53,10 @@ El hito 0 ya dejó parte del contrato. Lo que falta se enumera aquí; es lo prim
 | `GameEvents` | Existe | Compartido | Ambos | Solo cambios aditivos; hoy tiene jugador, estación, `HullImpacted`, fugas y alarma |
 | `HullZone` / `DamageLevel` | Existen (`Core/GameTypes.cs`) | B | `DamageSystem`, A | No mover de sitio; A los lee |
 | `SonarContact` + evento de contactos | Pendiente (hito 3) | A | B (HUD) | Struct + lista inmutable por emisión |
-| `ISubmarinePose` | Pendiente (hito 1) | A | B (2, 4, 6b) | `MapPosition`, `Yaw`, `Velocity`, `WorldToSubmarine`, `SubmarineToWorld` |
-| `SubmarineFrame` + `WorldRoot` | Pendiente (hito 1) | A | B | Pose inversa y rebase; única autoridad del `WorldRoot` |
-| `SubmarineProxy` con collider por sala | Pendiente (hito 1) | A | B (hito 5) | Cada collider hijo con su `HullZone` |
-| Capas `Interior`, `HullProxy`, `World`, `Hazard` | Pendiente (hito 1) | A | Ambos | En `ProjectSettings/TagManager.asset` |
+| `ISubmarinePose` | Existe | A | B (2, 4, 6b) | `MapPosition`, `Yaw`, `Velocity`, `WorldToSubmarine`, `SubmarineToWorld` |
+| `SubmarineFrame` + `WorldRoot` | Existe | A | B | Pose inversa y rebase; única autoridad del `WorldRoot` |
+| `SubmarineProxy` con collider por sala | Existe | A | B (hito 5) | Cada collider hijo con su `HullZone` |
+| Capas `Interior`, `HullProxy`, `World`, `Hazard` | Existe | A | Ambos | En `ProjectSettings/TagManager.asset` |
 
 Regla de oro: B nunca lee el `transform` del proxy ni del motor; usa `ISubmarinePose`. A nunca escribe en `Stations/` ni en `UI/`.
 
@@ -71,12 +71,12 @@ Hitos oficiales: **1, 3, 6a, 7a**. Orden interno obligatorio: **1 → 3 → 6a �
 | 6a | Rocas, columnas, arcos estrechos, corrientes laterales/verticales y minas, todo bajo `WorldRoot` y en capas `World`/`Hazard` | 1 y 3 | Hazards reales que el sónar ya detecta |
 | 7a | PlayMode: arranque, 4 slots con gamepad, rebase, corrientes y minas, cadena colisión→fuga con los sistemas de B; checklist manual con 1 y 4 gamepads | 0–6a y los hitos 2, 4 y 5 de B | — |
 
-Notas del hito 1 (lo que hay que migrar del código actual):
+Notas del hito 1 (cerrado el 2026-11-26):
 
 - El objeto `Submarine` de `Bootstrap` pasa a ser el `SubmarineProxy`; conserva `Rigidbody`, `Capsule` y `SubmarineMotor`.
 - Añadir un collider hijo por sala (cinco) con su `HullZone`; son el punto de contacto que B mapea a daño.
 - `SubmarineFrame` copia la pose inversa completa al `WorldRoot` en `FixedUpdate`; el interior no se toca.
-- `ISubmarinePose.MapPosition` acumula recorrido y **no** se rebasa: confines, sonda, sónar y mapa lo usan. Hoy `SubmarineMotor` limita con la posición del `Rigidbody`, que sí se rebasa; hay que pasarlo a `MapPosition`.
+- `ISubmarinePose.MapPosition` acumula recorrido y **no** se rebasa: confines, sonda, sónar y mapa lo usan. `SubmarineMotor` ya limita con `MapPosition`, no con la posición del `Rigidbody`, que se rebasa.
 - Rebase cada `rebaseDistance` (2000 m por defecto) con interpolación apagada durante el salto.
 
 Notas del hito 3: el sónar no pinta HUD; entrega contactos y posición. El mapa de papel y los *blips* son de B (6b).
