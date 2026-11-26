@@ -15,12 +15,12 @@ namespace SonarCrew.Submarine
     /// fallo; accionar el interruptor no lo resuelve.
     /// Decide qué salas (y por tanto qué estaciones) quedan sin energía.
     /// </summary>
-    public class PowerSystem : MonoBehaviour
+    public class PowerSystem : MonoBehaviour, IPowerState
     {
         [SerializeField] private bool startBreakerOn = true;
         [SerializeField] private bool startFailed;
 
-        private HullZone[] _zones;
+        private HullRoom[] _zones;
 
         /// <summary>Se lanza cuando cambia la energía disponible.</summary>
         public event Action<bool> PowerChanged;
@@ -33,14 +33,16 @@ namespace SonarCrew.Submarine
         {
             BreakerOn = startBreakerOn;
             FailureActive = startFailed;
+            // Registrado por tipo concreto (estaciones) y por el contrato de A (motor).
             ServiceLocator.Register(this);
+            ServiceLocator.Register<IPowerState>(this);
         }
 
         private void Start()
         {
             // Las salas viven en esta misma escena (SubmarineInterior), así que
             // existen todas cuando arranca el sistema.
-            _zones = FindObjectsByType<HullZone>(FindObjectsInactive.Include);
+            _zones = FindObjectsByType<HullRoom>(FindObjectsInactive.Include);
             PublishToZones();
         }
 
@@ -81,11 +83,11 @@ namespace SonarCrew.Submarine
             // Las salas son de esta misma escena; se resuelven una vez y se
             // reutilizan. Si el sistema arranca antes de que existan, se reintenta.
             if (_zones == null)
-                _zones = FindObjectsByType<HullZone>(FindObjectsInactive.Include);
+                _zones = FindObjectsByType<HullRoom>(FindObjectsInactive.Include);
 
             if (_zones == null) return;
 
-            foreach (HullZone zone in _zones)
+            foreach (HullRoom zone in _zones)
             {
                 if (zone != null)
                     zone.SetPowerAvailable(HasPower);

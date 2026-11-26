@@ -6,7 +6,8 @@ using SonarCrew.Submarine;
 namespace SonarCrew.Stations
 {
     /// <summary>
-    /// Timón de la sala de mandos: giro (yaw) con el stick izquierdo.
+    /// Timón de la sala de mandos: giro (yaw) con el stick derecho.
+    /// El izquierdo queda para caminar, así el tripulante puede alejarse y soltar.
     /// Con daño grave la sala se queda sin timón: no responde y el submarino
     /// queda quieto (lo aplica el estado de mandos, que anula avance y giro).
     /// </summary>
@@ -39,6 +40,10 @@ namespace SonarCrew.Stations
             ? "Timón bloqueado (daño grave)"
             : "Timón " + _steer.ToString("+0.00;-0.00;0.00");
 
+        public override string OperateHint => _locked
+            ? "Timón sin respuesta (daño grave)"
+            : "Stick derecho ◄ ► gira · [Y] soltar o aléjate";
+
         protected override void OnOccupied(CrewController crew)
         {
             ApplySteer(0f);
@@ -51,12 +56,12 @@ namespace SonarCrew.Stations
 
         protected override void OnOperate(InputRouter router, int slotIndex)
         {
-            ApplySteer(_locked ? 0f : router.GetMove(slotIndex).x);
+            ApplySteer(_locked ? 0f : router.GetLook(slotIndex).x);
         }
 
         protected override void OnRoomDamage(DamageLevel level)
         {
-            bool locked = level >= DamageLevel.Severe;
+            bool locked = level >= DamageLevel.Grave;
             if (locked == _locked) return;
 
             _locked = locked;

@@ -17,6 +17,9 @@ namespace SonarCrew.Stations
         /// <summary>Texto de estado que la estación muestra a su ocupante.</summary>
         string StatusText { get; }
 
+        /// <summary>Cómo se opera la estación (texto corto para el HUD).</summary>
+        string OperateHint { get; }
+
         /// <summary>Motivo por el que el tripulante puede o no ocuparla.</summary>
         StationAvailability AvailabilityFor(CrewController crew);
 

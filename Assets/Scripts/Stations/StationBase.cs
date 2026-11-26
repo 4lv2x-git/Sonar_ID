@@ -17,7 +17,7 @@ namespace SonarCrew.Stations
         [Tooltip("Si necesita energía del suministro eléctrico para funcionar.")]
         [SerializeField] private bool requiresPower = true;
         [Tooltip("Sala a la que pertenece. Si se deja vacío se toma la del padre.")]
-        [SerializeField] private HullZone hullZone;
+        [SerializeField] private HullRoom room;
         [SerializeField] private bool showPrompt = true;
 
         private CrewController _occupant;
@@ -33,14 +33,20 @@ namespace SonarCrew.Stations
         public CrewController Occupant => _occupant;
 
         public bool RequiresPower => requiresPower;
-        public HullZone Zone => hullZone;
+
+        /// <summary>Sala a la que pertenece: estado de daño y energía.</summary>
+        public HullRoom Room => room;
+
+        /// <summary>Identidad de la sala, el mismo enum que usan los volúmenes del proxy de A.</summary>
+        public HullZone Zone => room != null ? room.Zone : HullZone.Mandos;
+
         public bool ShowPrompt => showPrompt;
 
         /// <summary>La sala suministra energía a esta estación.</summary>
-        public bool HasPower => !requiresPower || hullZone == null || hullZone.HasPower;
+        public bool HasPower => !requiresPower || room == null || room.HasPower;
 
         /// <summary>La sala tiene daño grave sin reparar.</summary>
-        public bool HasSevereDamage => hullZone != null && hullZone.HasSevereDamage;
+        public bool HasSevereDamage => room != null && room.HasSevereDamage;
 
         /// <summary>Daño que deja la estación completamente inutilizable.</summary>
         protected virtual bool OutOfServiceByDamage => false;
@@ -50,17 +56,20 @@ namespace SonarCrew.Stations
 
         public virtual string StatusText => StationName;
 
+        /// <summary>Cómo se opera la estación; el HUD lo muestra mientras la ocupas.</summary>
+        public virtual string OperateHint => "[X] Accionar";
+
         protected virtual void Awake()
         {
-            if (hullZone == null)
-                hullZone = GetComponentInParent<HullZone>();
+            if (room == null)
+                room = GetComponentInParent<HullRoom>();
         }
 
         private void Start()
         {
             // Si la sala empieza dañada, la estación aplica su efecto en el primer frame.
-            if (hullZone != null)
-                OnRoomDamage(hullZone.Damage);
+            if (room != null)
+                OnRoomDamage(room.Damage);
             OnStationStart();
         }
 
@@ -152,7 +161,7 @@ namespace SonarCrew.Stations
         {
         }
 
-        public void OnZoneDamageChanged(HullZone zone, DamageLevel level)
+        public void OnRoomDamageChanged(HullRoom zone, DamageLevel level)
         {
             OnRoomDamage(level);
             if (_occupant != null && !IsInService)
@@ -160,7 +169,7 @@ namespace SonarCrew.Stations
             StateChanged?.Invoke(this);
         }
 
-        public void OnZonePowerChanged(HullZone zone, bool powered)
+        public void OnRoomPowerChanged(HullRoom zone, bool powered)
         {
             OnPowerChanged(powered);
             if (_occupant != null && !IsInService)
@@ -169,7 +178,7 @@ namespace SonarCrew.Stations
         }
 
         /// <summary>Permite a un sistema externo inyectar la sala (pruebas).</summary>
-        public void SetHullZone(HullZone zone) => hullZone = zone;
+        public void SetRoom(HullRoom zone) => room = zone;
 
         /// <summary>Permite a una subclase fijar si necesita energía.</summary>
         protected void ConfigurePowerRequirement(bool required) => requiresPower = required;

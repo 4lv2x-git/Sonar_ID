@@ -23,6 +23,8 @@ namespace SonarCrew.Stations
         public int ContactCount => _contactCount;
         public bool IsOperational => !HasSevereDamage && HasPower;
 
+        public override string OperateHint => "[X] emitir barrido · [Y] soltar o aléjate";
+
         public override string StatusText
         {
             get

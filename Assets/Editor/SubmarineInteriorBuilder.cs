@@ -60,7 +60,7 @@ namespace SonarCrew.EditorTools
 
         private sealed class RoomSpec
         {
-            public RoomId Id;
+            public HullZone Id;
             public string NodeName;
             public string DisplayName;
             public Vector2 Center;
@@ -72,12 +72,12 @@ namespace SonarCrew.EditorTools
         private sealed class StationSpec
         {
             public StationKind Kind;
-            public RoomId Room;
+            public HullZone Room;
             public Vector3 Position;
             public float Yaw;
         }
 
-        [MenuItem("Sonar Crew/Hito 2/Reconstruir SubmarineInterior", false, 20)]
+        [MenuItem("SonarCrew/Hito 2 (persona B)/Reconstruir SubmarineInterior", false, 20)]
         public static void BuildInterior()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -172,7 +172,7 @@ namespace SonarCrew.EditorTools
         }
 
         /// <summary>Abre la escena del interior para inspeccionarla.</summary>
-        [MenuItem("Sonar Crew/Hito 2/Abrir SubmarineInterior", false, 21)]
+        [MenuItem("SonarCrew/Hito 2 (persona B)/Abrir SubmarineInterior", false, 21)]
         public static void OpenInterior()
         {
             if (!System.IO.File.Exists(InteriorScenePath))
@@ -198,6 +198,43 @@ namespace SonarCrew.EditorTools
             BuildWallBlock(parent, "DivisoriaNorteEste", false, 6f, CorridorHalfWidth + WallThickness * 0.5f, HullInner, wallMaterial);
 
             BuildSegmentedWall(parent, "MuroPopa", false, -6f, -HullInner, HullInner, new[] { 0f }, wallMaterial);
+
+            BuildHullShell(parent, wallMaterial);
+            BuildCorridorLights(parent);
+        }
+
+        /// <summary>
+        /// Cierra el casco: el interior es estático y opaco, así que el mundo solo
+        /// se ve por las ventanas y visores (periscopio). Sin estas paredes y el
+        /// techo las cámaras de la tripulación mirarían directamente al mapa.
+        /// </summary>
+        private static void BuildHullShell(Transform parent, Material wallMaterial)
+        {
+            BuildWallBlock(parent, "CascoProa", false, HullInner, -HullInner, HullInner, wallMaterial);
+            BuildWallBlock(parent, "CascoPopa", false, -HullInner, -HullInner, HullInner, wallMaterial);
+            BuildWallBlock(parent, "CascoBabor", true, -HullInner, -HullInner, HullInner, wallMaterial);
+            BuildWallBlock(parent, "CascoEstribor", true, HullInner, -HullInner, HullInner, wallMaterial);
+
+            CreateBox(parent, "Techo", new Vector3(0f, WallHeight + 0.1f, 0f),
+                new Vector3(HullInner * 2f, 0.2f, HullInner * 2f), Quaternion.identity, wallMaterial);
+        }
+
+        private static void BuildCorridorLights(Transform parent)
+        {
+            Transform lights = CreateChild(parent, "LucesPasillo");
+            for (int i = 0; i < 4; i++)
+            {
+                GameObject lightObject = new GameObject("LuzPasillo" + (i + 1));
+                lightObject.transform.SetParent(lights, false);
+                lightObject.transform.localPosition = new Vector3(0f, WallHeight - 0.35f, -3f + i * 6f);
+
+                Light light = lightObject.AddComponent<Light>();
+                light.type = LightType.Point;
+                light.range = 12f;
+                light.intensity = 1.6f;
+                light.color = new Color(0.85f, 0.92f, 1f);
+                light.shadows = LightShadows.None;
+            }
         }
 
         /// <summary>Muro recto con huecos de puerta: tramos de pared y dinteles.</summary>
@@ -271,8 +308,8 @@ namespace SonarCrew.EditorTools
                 roomNode.transform.SetParent(roomsRoot, false);
                 roomNode.transform.localPosition = new Vector3(room.Center.x, 0f, room.Center.y);
 
-                HullZone zone = roomNode.AddComponent<HullZone>();
-                SetEnumField(zone, "roomId", (int)room.Id);
+                HullRoom zone = roomNode.AddComponent<HullRoom>();
+                SetEnumField(zone, "zone", (int)room.Id);
                 SetStringField(zone, "displayName", room.DisplayName);
                 SetBoolField(zone, "dependsOnPower", room.DependsOnPower);
 
@@ -306,31 +343,31 @@ namespace SonarCrew.EditorTools
             {
                 new RoomSpec
                 {
-                    Id = RoomId.ControlRoom, NodeName = "Sala_Mandos", DisplayName = "Sala de mandos",
+                    Id = HullZone.Mandos, NodeName = "Sala_Mandos", DisplayName = "Sala de mandos",
                     Center = new Vector2(-11.5f, 12.75f), Size = new Vector2(16f, 13.5f),
                     LightColor = new Color(1f, 0.92f, 0.78f)
                 },
                 new RoomSpec
                 {
-                    Id = RoomId.SensorRoom, NodeName = "Sala_Sensores", DisplayName = "Sala de sensores",
+                    Id = HullZone.Sensores, NodeName = "Sala_Sensores", DisplayName = "Sala de sensores",
                     Center = new Vector2(11.5f, 12.75f), Size = new Vector2(16f, 13.5f),
                     LightColor = new Color(0.78f, 0.9f, 1f)
                 },
                 new RoomSpec
                 {
-                    Id = RoomId.EngineRoom, NodeName = "Sala_Maquinas", DisplayName = "Sala de máquinas",
+                    Id = HullZone.Maquinas, NodeName = "Sala_Maquinas", DisplayName = "Sala de máquinas",
                     Center = new Vector2(-11.5f, 0f), Size = new Vector2(16f, 12f),
                     LightColor = new Color(1f, 0.82f, 0.65f)
                 },
                 new RoomSpec
                 {
-                    Id = RoomId.InfoRoom, NodeName = "Sala_Informacion", DisplayName = "Sala de información y documentación",
+                    Id = HullZone.Informacion, NodeName = "Sala_Informacion", DisplayName = "Sala de información y documentación",
                     Center = new Vector2(11.5f, 0f), Size = new Vector2(16f, 12f),
                     LightColor = new Color(0.85f, 1f, 0.88f)
                 },
                 new RoomSpec
                 {
-                    Id = RoomId.GrappleRoom, NodeName = "Sala_Gancho", DisplayName = "Sala del gancho recolector",
+                    Id = HullZone.Gancho, NodeName = "Sala_Gancho", DisplayName = "Sala del gancho recolector",
                     Center = new Vector2(0f, -12.75f), Size = new Vector2(39f, 13.5f),
                     LightColor = new Color(1f, 0.8f, 0.86f)
                 }
@@ -341,15 +378,17 @@ namespace SonarCrew.EditorTools
         {
             return new List<StationSpec>
             {
-                new StationSpec { Kind = StationKind.Wheel, Room = RoomId.ControlRoom, Position = new Vector3(-11.5f, 0f, 17.4f), Yaw = 180f },
-                new StationSpec { Kind = StationKind.Levers, Room = RoomId.ControlRoom, Position = new Vector3(-16.5f, 0f, 17.4f), Yaw = 180f },
-                new StationSpec { Kind = StationKind.Periscope, Room = RoomId.ControlRoom, Position = new Vector3(-6.5f, 0f, 16.5f), Yaw = 180f },
-                new StationSpec { Kind = StationKind.Sonar, Room = RoomId.SensorRoom, Position = new Vector3(8f, 0f, 17.4f), Yaw = 180f },
-                new StationSpec { Kind = StationKind.Sensors, Room = RoomId.SensorRoom, Position = new Vector3(15f, 0f, 17.4f), Yaw = 180f },
-                new StationSpec { Kind = StationKind.Engine, Room = RoomId.EngineRoom, Position = new Vector3(-11.5f, 0f, 4.4f), Yaw = 180f },
-                new StationSpec { Kind = StationKind.Power, Room = RoomId.EngineRoom, Position = new Vector3(-17.5f, 0f, 4.4f), Yaw = 180f },
-                new StationSpec { Kind = StationKind.Map, Room = RoomId.InfoRoom, Position = new Vector3(11.5f, 0f, 3f), Yaw = 180f },
-                new StationSpec { Kind = StationKind.Grapple, Room = RoomId.GrappleRoom, Position = new Vector3(0f, 0f, -15f), Yaw = 0f }
+                new StationSpec { Kind = StationKind.Wheel, Room = HullZone.Mandos, Position = new Vector3(-11.5f, 0f, 17.4f), Yaw = 180f },
+                new StationSpec { Kind = StationKind.Levers, Room = HullZone.Mandos, Position = new Vector3(-16.5f, 0f, 17.4f), Yaw = 180f },
+                new StationSpec { Kind = StationKind.Periscope, Room = HullZone.Mandos, Position = new Vector3(-6.5f, 0f, 16.5f), Yaw = 180f },
+                // El sónar se queda en la sala de sensores; los sensores de datos se
+                // consultan junto al mapa en la sala de información (README).
+                new StationSpec { Kind = StationKind.Sonar, Room = HullZone.Sensores, Position = new Vector3(11.5f, 0f, 17.4f), Yaw = 180f },
+                new StationSpec { Kind = StationKind.Sensors, Room = HullZone.Informacion, Position = new Vector3(7.5f, 0f, 4.6f), Yaw = 180f },
+                new StationSpec { Kind = StationKind.Engine, Room = HullZone.Maquinas, Position = new Vector3(-11.5f, 0f, 4.4f), Yaw = 180f },
+                new StationSpec { Kind = StationKind.Power, Room = HullZone.Maquinas, Position = new Vector3(-17.5f, 0f, 4.4f), Yaw = 180f },
+                new StationSpec { Kind = StationKind.Map, Room = HullZone.Informacion, Position = new Vector3(14.5f, 0f, 2.5f), Yaw = 180f },
+                new StationSpec { Kind = StationKind.Grapple, Room = HullZone.Gancho, Position = new Vector3(0f, 0f, -15f), Yaw = 0f }
             };
         }
 
@@ -376,7 +415,10 @@ namespace SonarCrew.EditorTools
 
             GameObject controlsObject = new GameObject("MandosSubmarino");
             controlsObject.transform.SetParent(systems, false);
-            controlsObject.AddComponent<SubmarineControlState>();
+            SubmarineControlState controls = controlsObject.AddComponent<SubmarineControlState>();
+            // El motor arranca en marcha para no bloquear el pilotaje del hito 1;
+            // la estación de motor de la sala de máquinas lo para y lo vuelve a arrancar.
+            SetBoolField(controls, "engineRunningAtStart", true);
 
             GameObject hudObject = new GameObject("InstaladorHUD");
             hudObject.transform.SetParent(systems, false);
@@ -413,16 +455,16 @@ namespace SonarCrew.EditorTools
             SerializedProperty zones = serialized.FindProperty("zones");
             zones.arraySize = 5;
             for (int i = 0; i < 5; i++)
-                zones.GetArrayElementAtIndex(i).objectReferenceValue = FindZone(engineRoom.parent, (RoomId)i);
+                zones.GetArrayElementAtIndex(i).objectReferenceValue = FindRoom(engineRoom.parent, (HullZone)i);
             serialized.FindProperty("powerSystem").objectReferenceValue = powerSystem;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        private static HullZone FindZone(Transform roomsRoot, RoomId roomId)
+        private static HullRoom FindRoom(Transform roomsRoot, HullZone zone)
         {
-            foreach (HullZone zone in roomsRoot.GetComponentsInChildren<HullZone>(true))
+            foreach (HullRoom room in roomsRoot.GetComponentsInChildren<HullRoom>(true))
             {
-                if (zone.RoomId == roomId) return zone;
+                if (room.Zone == zone) return room;
             }
             return null;
         }

@@ -19,10 +19,18 @@ namespace SonarCrew.Multiplayer
         public InputAction Crouch;
         public InputAction Previous;
         public InputAction Next;
+        // Pilotaje del submarino (hito 1): timón y palancas. Hito 2: la estación
+        // de mandos gatea por TryOccupy; aquí basta el driver del slot activo.
+        public InputAction Wheel;           // timón: yaw (eje x del stick derecho)
+        public InputAction ThrustForward;   // palanca avance (gatillo derecho)
+        public InputAction ThrustBackward;  // palanca retroceso (gatillo izquierdo)
+        public InputAction Ascend;          // palanca ascenso (D-pad arriba)
+        public InputAction Descend;         // palanca descenso (D-pad abajo)
 
         private InputAction[] All()
         {
-            return new[] { Move, Look, Interact, Jump, Sprint, Attack, Crouch, Previous, Next };
+            return new[] { Move, Look, Interact, Jump, Sprint, Attack, Crouch, Previous, Next,
+                Wheel, ThrustForward, ThrustBackward, Ascend, Descend };
         }
 
         public void Enable()
@@ -46,6 +54,12 @@ namespace SonarCrew.Multiplayer
     {
         [SerializeField] private int maxPlayers = 4;
 
+        [Header("Depuración (solo lectura, slot 0)")]
+        [SerializeField] private float debugThrustForward;
+        [SerializeField] private float debugThrustBackward;
+        [SerializeField] private float debugWheel;
+        [SerializeField] private Vector2 debugMove;
+
         private readonly PlayerSlot[] _slots = new PlayerSlot[4];
         private readonly SlotInput[] _inputs = new SlotInput[4];
         private readonly Gamepad[] _pads = new Gamepad[4];
@@ -59,6 +73,15 @@ namespace SonarCrew.Multiplayer
         private void Awake()
         {
             ServiceLocator.Register(this);
+        }
+
+        private void Update()
+        {
+            // Solo lectura en el Inspector durante Play, para el slot 0.
+            debugThrustForward = GetThrustForward(0);
+            debugThrustBackward = GetThrustBackward(0);
+            debugWheel = GetWheel(0);
+            debugMove = GetMove(0);
         }
 
         private void OnEnable()
@@ -156,6 +179,16 @@ namespace SonarCrew.Multiplayer
             input.Crouch = new InputAction("Crouch", InputActionType.Button, binding: p + "/buttonEast");
             input.Previous = new InputAction("Previous", InputActionType.Button, binding: p + "/dpad/left");
             input.Next = new InputAction("Next", InputActionType.Button, binding: p + "/dpad/right");
+            input.Wheel = new InputAction("Wheel", InputActionType.Value, expectedControlType: "Axis");
+            input.Wheel.AddBinding(p + "/rightStick/x");
+            // Palancas continuas: Value + Axis para leer 0..1 analógico del gatillo,
+            // igual que el timón (un Button sobre eje analógico solo expone estados cortados).
+            input.ThrustForward = new InputAction("ThrustForward", InputActionType.Value, expectedControlType: "Axis");
+            input.ThrustForward.AddBinding(p + "/rightTrigger");
+            input.ThrustBackward = new InputAction("ThrustBackward", InputActionType.Value, expectedControlType: "Axis");
+            input.ThrustBackward.AddBinding(p + "/leftTrigger");
+            input.Ascend = new InputAction("Ascend", InputActionType.Button, binding: p + "/dpad/up");
+            input.Descend = new InputAction("Descend", InputActionType.Button, binding: p + "/dpad/down");
 
             input.Enable();
             return input;
@@ -202,7 +235,39 @@ namespace SonarCrew.Multiplayer
             return input != null && input.Sprint != null && input.Sprint.IsPressed();
         }
 
-        // Botón oeste: accionar la estación que se está operando.
+        public float GetWheel(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.Wheel != null ? input.Wheel.ReadValue<float>() : 0f;
+        }
+
+        public float GetThrustForward(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.ThrustForward != null ? input.ThrustForward.ReadValue<float>() : 0f;
+        }
+
+        public float GetThrustBackward(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.ThrustBackward != null ? input.ThrustBackward.ReadValue<float>() : 0f;
+        }
+
+        public bool GetAscendHeld(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.Ascend != null && input.Ascend.IsPressed();
+        }
+
+        public bool GetDescendHeld(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.Descend != null && input.Descend.IsPressed();
+        }
+
+        // --- Botones de estación (hito 2, persona B) ---
+
+        /// <summary>Botón oeste: accionar la estación que se está operando.</summary>
         public bool GetAttackPressed(int slot)
         {
             SlotInput input = Slot(slot);

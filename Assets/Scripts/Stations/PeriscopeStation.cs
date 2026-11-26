@@ -27,6 +27,10 @@ namespace SonarCrew.Stations
 
         public bool IsLocked => _locked;
 
+        public override string OperateHint => _locked
+            ? "Periscopio sin rotación (daño grave)"
+            : "Stick derecho mira · [Y] soltar o aléjate";
+
         public override string StatusText => _locked
             ? "Periscopio fijo (daño grave)"
             : "Rumbo " + Mathf.Repeat(_yaw, 360f).ToString("0") + "º";
@@ -61,7 +65,7 @@ namespace SonarCrew.Stations
 
         protected override void OnRoomDamage(DamageLevel level)
         {
-            _locked = level >= DamageLevel.Severe;
+            _locked = level >= DamageLevel.Grave;
         }
 
         private void ApplyRotation()

@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 using UnityEngine.InputSystem;
 using SonarCrew.Multiplayer;
 using SonarCrew.Stations;
@@ -7,9 +8,6 @@ namespace SonarCrew.Core
 {
     /// <summary>
     /// Eventos globales del juego. Comunicación entre sistemas con eventos C# puros.
-    /// Archivo compartido: solo cambios aditivos y anunciados en el commit.
-    /// El daño de sala y la energía se consultan en HullZone/PowerSystem (eventos
-    /// de instancia); aquí queda lo que necesita difusión global.
     /// </summary>
     public static class GameEvents
     {
@@ -21,8 +19,31 @@ namespace SonarCrew.Core
         public static event Action<IStation, CrewController> StationOccupied;
         public static event Action<IStation, CrewController> StationReleased;
 
-        /// <summary>Alarma para el HUD (daños, mapa no fiable...).</summary>
-        public static event Action<string> AlarmRaised;
+        /// <summary>Colisión del casco: impulso, punto de contacto, sala y severidad (hito 5).</summary>
+        public static event Action<float, Vector3, HullZone, DamageLevel> HullImpacted;
+        public static event Action<HullZone> LeakOpened;
+        public static event Action<HullZone> LeakClosed;
+        public static event Action AlarmRaised;
+
+        public static void RaiseHullImpacted(float impulse, Vector3 point, HullZone zone, DamageLevel level)
+        {
+            HullImpacted?.Invoke(impulse, point, zone, level);
+        }
+
+        public static void RaiseLeakOpened(HullZone zone)
+        {
+            LeakOpened?.Invoke(zone);
+        }
+
+        public static void RaiseLeakClosed(HullZone zone)
+        {
+            LeakClosed?.Invoke(zone);
+        }
+
+        public static void RaiseAlarm()
+        {
+            AlarmRaised?.Invoke();
+        }
 
         public static void RaisePlayerDeviceAssigned(int slot, Gamepad pad)
         {
@@ -47,11 +68,6 @@ namespace SonarCrew.Core
         public static void RaiseStationReleased(IStation station, CrewController crew)
         {
             StationReleased?.Invoke(station, crew);
-        }
-
-        public static void RaiseAlarmRaised(string message)
-        {
-            AlarmRaised?.Invoke(message);
         }
     }
 }

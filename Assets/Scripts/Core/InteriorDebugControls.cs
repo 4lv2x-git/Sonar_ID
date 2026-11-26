@@ -12,9 +12,12 @@ namespace SonarCrew.Core
     /// </summary>
     public class InteriorDebugControls : MonoBehaviour
     {
-        [SerializeField] private HullZone[] zones = new HullZone[5];
+        [SerializeField] private HullRoom[] zones = new HullRoom[5];
         [SerializeField] private PowerSystem powerSystem;
         [SerializeField] private bool enabledInBuilds;
+
+        /// <summary>Teclas de daño por sala, en el orden del enum <see cref="HullZone"/>.</summary>
+        private static readonly Key[] ZoneKeys = { Key.F1, Key.F2, Key.F3, Key.F4, Key.F5 };
 
         private void Update()
         {
@@ -23,10 +26,9 @@ namespace SonarCrew.Core
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null) return;
 
-            Key[] zoneKeys = { Key.F1, Key.F2, Key.F3, Key.F4, Key.F5 };
-            for (int i = 0; i < zoneKeys.Length && i < zones.Length; i++)
+            for (int i = 0; i < ZoneKeys.Length && i < zones.Length; i++)
             {
-                if (keyboard[zoneKeys[i]].wasPressedThisFrame)
+                if (keyboard[ZoneKeys[i]].wasPressedThisFrame)
                     ToggleSevereDamage(zones[i]);
             }
 
@@ -40,7 +42,7 @@ namespace SonarCrew.Core
                 powerSystem.SetFailure(!powerSystem.FailureActive);
         }
 
-        private static void ToggleSevereDamage(HullZone zone)
+        private static void ToggleSevereDamage(HullRoom zone)
         {
             if (zone == null) return;
 
@@ -51,13 +53,13 @@ namespace SonarCrew.Core
                 return;
             }
 
-            zone.SetDamage(DamageLevel.Severe);
+            zone.SetDamage(DamageLevel.Grave);
             Debug.Log("[Prueba] " + zone.DisplayName + " con daño grave.");
         }
 
         public void RepairAll()
         {
-            foreach (HullZone zone in zones)
+            foreach (HullRoom zone in zones)
                 zone?.Repair();
 
             Debug.Log("[Prueba] Todas las salas reparadas.");

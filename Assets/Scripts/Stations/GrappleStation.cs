@@ -27,6 +27,8 @@ namespace SonarCrew.Stations
         public float Extension => _extension;
         public bool IsLowered => _lowered;
 
+        public override string OperateHint => "[X] bajar / izar · [Y] soltar o aléjate";
+
         public override string StatusText
         {
             get
@@ -53,7 +55,7 @@ namespace SonarCrew.Stations
         protected override void OnRoomDamage(DamageLevel level)
         {
             // README: con daño grave el gancho se retrae solo y deja de funcionar.
-            if (level >= DamageLevel.Severe)
+            if (level >= DamageLevel.Grave)
                 Retract();
         }
 

@@ -22,9 +22,12 @@ namespace SonarCrew.UI
 
         [Header("Glifos (dependen del mando; en Xbox: Y = interactuar, X = accionar)")]
         [SerializeField] private string interactGlyph = "Y";
-        [SerializeField] private string attackGlyph = "X";
 
         private const float AlarmDuration = 4f;
+
+        /// <summary>Los textos se refrescan a 10 Hz: no hace falta más y evita reconstrucciones por frame.</summary>
+        private const float RefreshInterval = 0.1f;
+
         private static Font _font;
 
         private RectTransform _root;
@@ -34,6 +37,7 @@ namespace SonarCrew.UI
         private Text _alarmText;
         private Rect _lastRect = new Rect(-1f, -1f, -1f, -1f);
         private float _alarmUntil;
+        private float _refreshTimer;
 
         private int SlotIndex => crew != null && crew.Slot != null ? crew.Slot.Index : 0;
 
@@ -59,10 +63,15 @@ namespace SonarCrew.UI
             if (_root == null) return;
 
             FollowCameraRect();
+            UpdateAlarm();
+
+            _refreshTimer -= Time.unscaledDeltaTime;
+            if (_refreshTimer > 0f) return;
+            _refreshTimer = RefreshInterval;
+
             UpdatePrompt();
             UpdateStatus();
             UpdatePower();
-            UpdateAlarm();
         }
 
         private void Build()
@@ -137,7 +146,7 @@ namespace SonarCrew.UI
 
             if (crew.OccupiedStation != null)
             {
-                _promptText.text = "[" + attackGlyph + "] Accionar      [" + interactGlyph + "] Soltar";
+                SetText(_promptText, crew.OccupiedStation.OperateHint);
                 _promptText.color = Color.white;
                 return;
             }
@@ -145,19 +154,19 @@ namespace SonarCrew.UI
             IStation focused = crew.CurrentStation;
             if (focused == null)
             {
-                _promptText.text = string.Empty;
+                SetText(_promptText, string.Empty);
                 return;
             }
 
             StationAvailability availability = focused.AvailabilityFor(crew);
             if (availability == StationAvailability.Available)
             {
-                _promptText.text = "[" + interactGlyph + "] " + focused.StationName;
+                SetText(_promptText, "[" + interactGlyph + "] " + focused.StationName);
                 _promptText.color = Color.white;
             }
             else
             {
-                _promptText.text = focused.StationName + " · " + Describe(availability);
+                SetText(_promptText, focused.StationName + " · " + Describe(availability));
                 _promptText.color = new Color(1f, 0.65f, 0.55f);
             }
         }
@@ -169,11 +178,11 @@ namespace SonarCrew.UI
 
             string label = "J" + (SlotIndex + 1);
             if (crew.OccupiedStation != null)
-                _statusText.text = label + "  ·  " + crew.OccupiedStation.StationName + "\n" + crew.OccupiedStation.StatusText;
+                SetText(_statusText, label + "  ·  " + crew.OccupiedStation.StationName + "\n" + crew.OccupiedStation.StatusText);
             else if (crew.CurrentStation != null)
-                _statusText.text = label + "\n" + crew.CurrentStation.StationName;
+                SetText(_statusText, label + "\n" + crew.CurrentStation.StationName);
             else
-                _statusText.text = label;
+                SetText(_statusText, label);
         }
 
         private void UpdatePower()
@@ -182,30 +191,36 @@ namespace SonarCrew.UI
 
             if (!ServiceLocator.TryGet(out PowerSystem power))
             {
-                _powerText.text = string.Empty;
+                SetText(_powerText, string.Empty);
                 return;
             }
 
             if (power.FailureActive)
-                _powerText.text = "SIN ENERGÍA (avería)";
+                SetText(_powerText, "SIN ENERGÍA (avería)");
             else if (!power.HasPower)
-                _powerText.text = "SIN ENERGÍA";
+                SetText(_powerText, "SIN ENERGÍA");
             else
-                _powerText.text = string.Empty;
+                SetText(_powerText, string.Empty);
         }
 
         private void UpdateAlarm()
         {
             if (_alarmText == null) return;
-            if (Time.time >= _alarmUntil && _alarmText.text.Length > 0)
-                _alarmText.text = string.Empty;
+            if (_alarmText.text.Length > 0 && Time.time >= _alarmUntil)
+                SetText(_alarmText, string.Empty);
         }
 
-        private void OnAlarmRaised(string message)
+        private void OnAlarmRaised()
         {
-            if (_alarmText == null) return;
-            _alarmText.text = "¡ALARMA! " + message;
+            SetText(_alarmText, "¡ALARMA!");
             _alarmUntil = Time.time + AlarmDuration;
+        }
+
+        /// <summary>Escribe solo si el texto cambia: uGUI reconstruye la malla en cada asignación.</summary>
+        private static void SetText(Text target, string value)
+        {
+            if (target != null && target.text != value)
+                target.text = value;
         }
 
         private Text CreateText(string objectName, TextAnchor alignment, int fontSize, Color color)

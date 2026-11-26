@@ -6,8 +6,10 @@ using SonarCrew.Submarine;
 namespace SonarCrew.Stations
 {
     /// <summary>
-    /// Palancas de la sala de mandos: avance/retroceso con el stick izquierdo
-    /// (vertical) y ascenso/descenso con el stick derecho (vertical).
+    /// Palancas de la sala de mandos: avance/retroceso con el stick derecho
+    /// (vertical) y ascenso/descenso con el mismo stick (horizontal).
+    /// El stick izquierdo queda libre para caminar: así el tripulante puede
+    /// alejarse de la estación y se libera por distancia.
     /// Escribe en el estado de mandos que consumirá el motor del Hito 1.
     /// </summary>
     public class LeversStation : StationBase
@@ -37,13 +39,17 @@ namespace SonarCrew.Stations
             "Avance " + _throttle.ToString("+0.00;-0.00;0.00") +
             "   Cota " + _vertical.ToString("+0.00;-0.00;0.00");
 
+        public override string OperateHint =>
+            "Stick derecho ▲▼ avance · ◄► cota · [Y] soltar o aléjate";
+
         protected override void OnOccupied(CrewController crew) => Apply(0f, 0f);
 
         protected override void OnReleased(CrewController crew) => Apply(0f, 0f);
 
         protected override void OnOperate(InputRouter router, int slotIndex)
         {
-            Apply(router.GetMove(slotIndex).y, router.GetLook(slotIndex).y);
+            Vector2 stick = router.GetLook(slotIndex);
+            Apply(stick.y, stick.x);
         }
 
         private void Apply(float throttle, float vertical)

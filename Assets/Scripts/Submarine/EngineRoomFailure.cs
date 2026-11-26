@@ -9,7 +9,7 @@ namespace SonarCrew.Submarine
     /// la partida elige entre paro completo del motor o fallo eléctrico.
     /// Va en la propia sala para que la tirada ocurra una sola vez por daño.
     /// </summary>
-    [RequireComponent(typeof(HullZone))]
+    [RequireComponent(typeof(HullRoom))]
     public class EngineRoomFailure : MonoBehaviour
     {
         /// <summary>Resultado de la tirada, para poder comprobarlo en pruebas.</summary>
@@ -25,14 +25,14 @@ namespace SonarCrew.Submarine
         [Range(0f, 1f)]
         [SerializeField] private float electricalFailureChance = 0.5f;
 
-        private HullZone _zone;
+        private HullRoom _zone;
         private FailureMode _mode = FailureMode.None;
 
         public FailureMode LastMode => _mode;
 
         private void Awake()
         {
-            _zone = GetComponent<HullZone>();
+            _zone = GetComponent<HullRoom>();
         }
 
         private void OnEnable()
@@ -47,9 +47,9 @@ namespace SonarCrew.Submarine
                 _zone.DamageChanged -= OnDamageChanged;
         }
 
-        private void OnDamageChanged(HullZone zone, DamageLevel level)
+        private void OnDamageChanged(HullRoom zone, DamageLevel level)
         {
-            if (level >= DamageLevel.Severe)
+            if (level >= DamageLevel.Grave)
                 RollFailure();
             else
                 ClearFailure();

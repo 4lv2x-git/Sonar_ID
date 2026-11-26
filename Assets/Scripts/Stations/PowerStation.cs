@@ -20,6 +20,8 @@ namespace SonarCrew.Stations
 
         protected override string DefaultStationName => "Suministro eléctrico";
 
+        public override string OperateHint => "[X] conectar / cortar · [Y] soltar o aléjate";
+
         public override string StatusText
         {
             get

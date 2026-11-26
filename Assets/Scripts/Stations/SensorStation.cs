@@ -22,6 +22,8 @@ namespace SonarCrew.Stations
 
         public SensorReading Reading => _reading;
 
+        public override string OperateHint => "[X] nueva lectura · [Y] soltar o aléjate";
+
         public override string StatusText
         {
             get

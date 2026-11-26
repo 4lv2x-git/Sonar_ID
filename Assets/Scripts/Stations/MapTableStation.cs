@@ -15,16 +15,18 @@ namespace SonarCrew.Stations
     {
         [Header("Mapa")]
         [Tooltip("Salas que el mapa puede reportar. Si queda vacío se buscan al iniciar.")]
-        [SerializeField] private HullZone[] knownRooms;
+        [SerializeField] private HullRoom[] knownRooms;
         [SerializeField] private float falseAlarmInterval = 7f;
 
-        private readonly List<HullZone> _reportedDamaged = new List<HullZone>();
+        private readonly List<HullRoom> _reportedDamaged = new List<HullRoom>();
         private float _nextFalseAlarmTime;
         private bool _roomsResolved;
 
         protected override string DefaultStationName => "Mapa y documentación";
 
-        public IReadOnlyList<HullZone> ReportedDamaged => _reportedDamaged;
+        public IReadOnlyList<HullRoom> ReportedDamaged => _reportedDamaged;
+
+        public override string OperateHint => "[X] informe de posición · [Y] soltar o aléjate";
 
         public override string StatusText
         {
@@ -63,7 +65,7 @@ namespace SonarCrew.Stations
 
             _nextFalseAlarmTime = Time.time + falseAlarmInterval + Random.Range(0f, 3f);
             RefreshReport();
-            GameEvents.RaiseAlarmRaised("Mapa: lectura de daños no fiable");
+            GameEvents.RaiseAlarm();
         }
 
         /// <summary>Recalcula lo que muestra el mapa: real o con daños falsos.</summary>
@@ -75,7 +77,7 @@ namespace SonarCrew.Stations
 
             if (!HasSevereDamage) return;
 
-            foreach (HullZone room in knownRooms)
+            foreach (HullRoom room in knownRooms)
             {
                 if (room == null) continue;
                 if (Random.value < 0.4f)
@@ -90,7 +92,7 @@ namespace SonarCrew.Stations
             _roomsResolved = true;
 
             if (knownRooms == null || knownRooms.Length == 0)
-                knownRooms = Object.FindObjectsByType<HullZone>();
+                knownRooms = Object.FindObjectsByType<HullRoom>();
         }
     }
 }

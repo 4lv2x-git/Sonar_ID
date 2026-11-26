@@ -26,6 +26,8 @@ namespace SonarCrew.Stations
         public bool MotorAvailable => _motorAvailable;
         public bool MotorRunning => _motorRunning;
 
+        public override string OperateHint => "[X] arrancar / parar · [Y] soltar o aléjate";
+
         public override string StatusText
         {
             get

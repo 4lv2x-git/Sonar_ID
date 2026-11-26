@@ -7,8 +7,10 @@ namespace SonarCrew.Multiplayer
     /// <summary>
     /// Movimiento en primera persona del tripulante dentro del casco.
     /// Detecta la estación más cercana, ocupa/libera con Interact y libera
-    /// al alejarse. Vive como hijo del transform del submarino (movimiento relativo al casco).
-    /// Mientras opera una estación no se mueve ni mira: los sticks pasan al mando.
+    /// al alejarse. Vive dentro del interior estático del casco: no hereda
+    /// ninguna pose móvil (lo que se desplaza por el mapa es la cápsula del proxy).
+    /// Al operar una estación el stick izquierdo sigue moviendo al tripulante
+    /// (para poder alejarse y soltarla) y el derecho pasa al mando de la estación.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     public class CrewController : MonoBehaviour
@@ -30,6 +32,15 @@ namespace SonarCrew.Multiplayer
         [SerializeField] private float interactRadius = 2.2f;
         [SerializeField] private float releaseRadius = 3.2f;
         [SerializeField] private LayerMask stationLayer = ~0;
+
+        /// <summary>Paso máximo por frame: evita saltos grandes tras un hitch.</summary>
+        private const float MaxFrameStep = 0.05f;
+
+        /// <summary>Cadencia del escaneo de estaciones cercanas (no hace falta por frame).</summary>
+        private const float StationScanInterval = 0.15f;
+
+        private readonly Collider[] _stationHits = new Collider[24];
+        private float _scanTimer;
 
         private CharacterController _controller;
         private PlayerSlot _slot;
@@ -85,31 +96,29 @@ namespace SonarCrew.Multiplayer
 
             if (!ServiceLocator.TryGet(out InputRouter router)) return;
 
-            if (IsOperatingStation)
-            {
-                SettleGravity();
-            }
-            else
-            {
-                HandleLook(router);
-                HandleMove(router);
-            }
+            float dt = Mathf.Min(Time.deltaTime, MaxFrameStep);
 
-            HandleStations(router);
+            // Operando una estación la mirada pasa al mando de esa estación,
+            // pero el movimiento sigue disponible para poder alejarse y soltarla.
+            if (!IsOperatingStation)
+                HandleLook(router, dt);
+
+            HandleMove(router, dt);
+            HandleStations(router, dt);
         }
 
-        private void HandleLook(InputRouter router)
+        private void HandleLook(InputRouter router, float dt)
         {
             Vector2 look = router.GetLook(_slot.Index);
-            _yaw += look.x * lookSensitivity * Time.deltaTime;
-            _pitch -= look.y * lookSensitivity * Time.deltaTime;
+            _yaw += look.x * lookSensitivity * dt;
+            _pitch -= look.y * lookSensitivity * dt;
             _pitch = Mathf.Clamp(_pitch, -maxPitch, maxPitch);
             transform.rotation = Quaternion.Euler(0f, _yaw, 0f);
             if (cameraPivot != null)
                 cameraPivot.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
         }
 
-        private void HandleMove(InputRouter router)
+        private void HandleMove(InputRouter router, float dt)
         {
             Vector2 move = router.GetMove(_slot.Index);
             bool sprint = router.GetSprintHeld(_slot.Index);
@@ -133,29 +142,16 @@ namespace SonarCrew.Multiplayer
             }
             else
             {
-                _verticalVelocity += gravity * Time.deltaTime;
+                _verticalVelocity += gravity * dt;
             }
 
             Vector3 motion = wishDir * speed + Vector3.up * _verticalVelocity;
-            _controller.Move(motion * Time.deltaTime);
+            _controller.Move(motion * dt);
         }
 
-        /// <summary>Al operar una estación el tripulante no se mueve, pero no se queda flotando.</summary>
-        private void SettleGravity()
+        private void HandleStations(InputRouter router, float dt)
         {
-            if (_controller.isGrounded)
-            {
-                _verticalVelocity = -0.5f;
-                return;
-            }
-
-            _verticalVelocity += gravity * Time.deltaTime;
-            _controller.Move(Vector3.up * (_verticalVelocity * Time.deltaTime));
-        }
-
-        private void HandleStations(InputRouter router)
-        {
-            CurrentStation = FindNearestStation();
+            RefreshNearestStation(dt);
 
             if (router.GetInteractPressed(_slot.Index))
             {
@@ -173,15 +169,28 @@ namespace SonarCrew.Multiplayer
             }
         }
 
+        /// <summary>Escanea a ~6 Hz: localizar la estación cercana no necesita cadencia de frame.</summary>
+        private void RefreshNearestStation(float dt)
+        {
+            _scanTimer -= dt;
+            if (_scanTimer > 0f) return;
+            _scanTimer = StationScanInterval;
+            CurrentStation = FindNearestStation();
+        }
+
         private IStation FindNearestStation()
         {
             Vector3 eye = transform.position + Vector3.up * 0.9f;
             IStation best = null;
             float bestSqr = interactRadius * interactRadius;
 
-            Collider[] hits = Physics.OverlapSphere(eye, interactRadius, stationLayer);
-            foreach (Collider hit in hits)
+            int count = Physics.OverlapSphereNonAlloc(eye, interactRadius, _stationHits, stationLayer, QueryTriggerInteraction.Collide);
+            for (int i = 0; i < count; i++)
             {
+                Collider hit = _stationHits[i];
+                _stationHits[i] = null;
+                if (hit == null) continue;
+
                 IStation station = hit.GetComponentInParent<IStation>();
                 if (station == null) continue;
 
