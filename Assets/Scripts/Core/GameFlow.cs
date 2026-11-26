@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 using SonarCrew.Multiplayer;
 
 namespace SonarCrew.Core
@@ -14,12 +15,19 @@ namespace SonarCrew.Core
 
     /// <summary>
     /// Arranque y estado global de la partida. Activa tantos PlayerSlot como
-    /// gamepads haya conectados (1-4) y les aplica el layout de pantalla dividida.
+    /// gamepads haya conectados (1-4), les aplica el layout de pantalla dividida y
+    /// carga de forma aditiva el interior del submarino (`SubmarineInterior`, la
+    /// escena de B) sin tocar `Bootstrap`, que es de A.
     /// </summary>
     public class GameFlow : MonoBehaviour
     {
         [SerializeField] private InputRouter inputRouter;
         [SerializeField] private PlayerSlot[] playerSlots = new PlayerSlot[4];
+
+        [Header("Escenas")]
+        [Tooltip("Escena aditiva con el casco y las salas (propiedad de B).")]
+        [SerializeField] private string interiorSceneName = "SubmarineInterior";
+        [SerializeField] private bool loadInteriorOnStart = true;
 
         public GameState State { get; private set; } = GameState.Boot;
         public int ActivePlayerCount { get; private set; }
@@ -33,6 +41,9 @@ namespace SonarCrew.Core
 
         private void Start()
         {
+            if (loadInteriorOnStart)
+                LoadInterior();
+
             if (inputRouter == null)
             {
                 Debug.LogError("GameFlow: falta la referencia a InputRouter.");
@@ -48,6 +59,24 @@ namespace SonarCrew.Core
         {
             if (inputRouter != null)
                 inputRouter.DeviceListChanged -= RefreshSlots;
+        }
+
+        /// <summary>Carga el interior una sola vez y de forma aditiva.</summary>
+        private void LoadInterior()
+        {
+            if (string.IsNullOrEmpty(interiorSceneName)) return;
+
+            Scene existing = SceneManager.GetSceneByName(interiorSceneName);
+            if (existing.IsValid() && existing.isLoaded) return;
+
+            if (!Application.CanStreamedLevelBeLoaded(interiorSceneName))
+            {
+                Debug.LogWarning("GameFlow: la escena '" + interiorSceneName +
+                                 "' no está en Build Settings; el interior no se cargará.");
+                return;
+            }
+
+            SceneManager.LoadSceneAsync(interiorSceneName, LoadSceneMode.Additive);
         }
 
         /// <summary>Activa los slots 0..N-1 según los gamepads conectados y refresca los rects.</summary>

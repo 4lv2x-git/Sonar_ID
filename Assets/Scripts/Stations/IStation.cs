@@ -14,6 +14,12 @@ namespace SonarCrew.Stations
         bool IsOccupied { get; }
         CrewController Occupant { get; }
 
+        /// <summary>Texto de estado que la estación muestra a su ocupante.</summary>
+        string StatusText { get; }
+
+        /// <summary>Motivo por el que el tripulante puede o no ocuparla.</summary>
+        StationAvailability AvailabilityFor(CrewController crew);
+
         /// <summary>Puede el tripulante ocuparla ahora (libre, sala sin daño grave, con energía...).</summary>
         bool CanOccupy(CrewController crew);
 

@@ -201,5 +201,30 @@ namespace SonarCrew.Multiplayer
             SlotInput input = Slot(slot);
             return input != null && input.Sprint != null && input.Sprint.IsPressed();
         }
+
+        // Botón oeste: accionar la estación que se está operando.
+        public bool GetAttackPressed(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.Attack != null && input.Attack.WasPressedThisFrame();
+        }
+
+        public bool GetAttackHeld(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.Attack != null && input.Attack.IsPressed();
+        }
+
+        public bool GetPreviousPressed(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.Previous != null && input.Previous.WasPressedThisFrame();
+        }
+
+        public bool GetNextPressed(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.Next != null && input.Next.WasPressedThisFrame();
+        }
     }
 }

@@ -8,6 +8,7 @@ namespace SonarCrew.Multiplayer
     /// Movimiento en primera persona del tripulante dentro del casco.
     /// Detecta la estación más cercana, ocupa/libera con Interact y libera
     /// al alejarse. Vive como hijo del transform del submarino (movimiento relativo al casco).
+    /// Mientras opera una estación no se mueve ni mira: los sticks pasan al mando.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     public class CrewController : MonoBehaviour
@@ -32,13 +33,31 @@ namespace SonarCrew.Multiplayer
 
         private CharacterController _controller;
         private PlayerSlot _slot;
+        private Camera _crewCamera;
         private float _yaw;
         private float _pitch;
         private float _verticalVelocity;
 
         public PlayerSlot Slot => _slot;
+
+        /// <summary>Cámara en primera persona del slot (vive en la escena de A: solo se lee).</summary>
+        public Camera CrewCamera
+        {
+            get
+            {
+                if (_crewCamera == null)
+                    _crewCamera = GetComponentInChildren<Camera>(true);
+                return _crewCamera;
+            }
+        }
+
+        /// <summary>Estación más cercana, ocupada o no (el HUD explica el motivo).</summary>
         public IStation CurrentStation { get; private set; }
+
+        /// <summary>Estación que este tripulante está operando, si hay alguna.</summary>
         public IStation OccupiedStation { get; private set; }
+
+        public bool IsOperatingStation => OccupiedStation != null;
 
         private void Awake()
         {
@@ -53,11 +72,29 @@ namespace SonarCrew.Multiplayer
 
         private void Update()
         {
-            if (_slot == null || !_slot.IsActive) return;
+            if (_slot == null) return;
+
+            if (!_slot.IsActive)
+            {
+                // Slot desactivado (gamepad desconectado): su estación no puede
+                // quedarse bloqueada para el resto de la tripulación.
+                if (OccupiedStation != null)
+                    OccupiedStation.Release(this);
+                return;
+            }
+
             if (!ServiceLocator.TryGet(out InputRouter router)) return;
 
-            HandleLook(router);
-            HandleMove(router);
+            if (IsOperatingStation)
+            {
+                SettleGravity();
+            }
+            else
+            {
+                HandleLook(router);
+                HandleMove(router);
+            }
+
             HandleStations(router);
         }
 
@@ -103,17 +140,51 @@ namespace SonarCrew.Multiplayer
             _controller.Move(motion * Time.deltaTime);
         }
 
+        /// <summary>Al operar una estación el tripulante no se mueve, pero no se queda flotando.</summary>
+        private void SettleGravity()
+        {
+            if (_controller.isGrounded)
+            {
+                _verticalVelocity = -0.5f;
+                return;
+            }
+
+            _verticalVelocity += gravity * Time.deltaTime;
+            _controller.Move(Vector3.up * (_verticalVelocity * Time.deltaTime));
+        }
+
         private void HandleStations(InputRouter router)
+        {
+            CurrentStation = FindNearestStation();
+
+            if (router.GetInteractPressed(_slot.Index))
+            {
+                if (OccupiedStation != null)
+                    OccupiedStation.Release(this);
+                else if (CurrentStation != null)
+                    CurrentStation.TryOccupy(this);
+            }
+
+            if (OccupiedStation != null)
+            {
+                float distance = Vector3.Distance(transform.position, OccupiedStation.StationTransform.position);
+                if (distance > releaseRadius)
+                    OccupiedStation.Release(this);
+            }
+        }
+
+        private IStation FindNearestStation()
         {
             Vector3 eye = transform.position + Vector3.up * 0.9f;
             IStation best = null;
             float bestSqr = interactRadius * interactRadius;
+
             Collider[] hits = Physics.OverlapSphere(eye, interactRadius, stationLayer);
             foreach (Collider hit in hits)
             {
                 IStation station = hit.GetComponentInParent<IStation>();
                 if (station == null) continue;
-                if (station.IsOccupied && station.Occupant != this) continue;
+
                 float sqr = (station.StationTransform.position - eye).sqrMagnitude;
                 if (sqr < bestSqr)
                 {
@@ -121,30 +192,15 @@ namespace SonarCrew.Multiplayer
                     best = station;
                 }
             }
-            CurrentStation = best;
 
-            if (router.GetInteractPressed(_slot.Index))
-            {
-                if (OccupiedStation != null)
-                    OccupiedStation.Release(this);
-                else if (best != null)
-                    best.TryOccupy(this);
-            }
-
-            if (OccupiedStation != null)
-            {
-                float dist = Vector3.Distance(transform.position, OccupiedStation.StationTransform.position);
-                if (dist > releaseRadius)
-                    OccupiedStation.Release(this);
-            }
+            return best;
         }
 
         /// <summary>Lo llama la estación cuando este tripulante la ocupa. Devuelve false si ya ocupaba otra.</summary>
         public bool NotifyOccupied(IStation station)
         {
-            if (OccupiedStation != null || station == null) return false;
+            if (station == null || OccupiedStation != null) return false;
             OccupiedStation = station;
-            GameEvents.RaiseStationOccupied(station, this);
             return true;
         }
 
@@ -152,10 +208,7 @@ namespace SonarCrew.Multiplayer
         public void NotifyReleased(IStation station)
         {
             if (OccupiedStation == station)
-            {
                 OccupiedStation = null;
-                GameEvents.RaiseStationReleased(station, this);
-            }
         }
     }
 }
