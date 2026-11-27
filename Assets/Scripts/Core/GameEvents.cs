@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using SonarCrew.Multiplayer;
 using SonarCrew.Stations;
+using SonarCrew.Submarine;
 
 namespace SonarCrew.Core
 {
@@ -25,6 +27,9 @@ namespace SonarCrew.Core
         public static event Action<HullZone> LeakClosed;
         public static event Action AlarmRaised;
 
+        /// <summary>Contactos del sónar (hito 3): instantánea inmutable en coordenadas de mapa.</summary>
+        public static event Action<IReadOnlyList<SonarContact>> SonarContactsUpdated;
+
         public static void RaiseHullImpacted(float impulse, Vector3 point, HullZone zone, DamageLevel level)
         {
             HullImpacted?.Invoke(impulse, point, zone, level);
@@ -43,6 +48,11 @@ namespace SonarCrew.Core
         public static void RaiseAlarm()
         {
             AlarmRaised?.Invoke();
+        }
+
+        public static void RaiseSonarContactsUpdated(IReadOnlyList<SonarContact> contacts)
+        {
+            SonarContactsUpdated?.Invoke(contacts);
         }
 
         public static void RaisePlayerDeviceAssigned(int slot, Gamepad pad)
