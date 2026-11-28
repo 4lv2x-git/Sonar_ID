@@ -31,6 +31,10 @@ namespace SonarCrew.UI
                 if (target.GetComponent<StationHUD>() == null)
                     target.AddComponent<StationHUD>();
             }
+
+            // La victoria la comparte toda la tripulación: una sola pantalla.
+            if (GetComponent<VictoryHUD>() == null)
+                gameObject.AddComponent<VictoryHUD>();
         }
     }
 }

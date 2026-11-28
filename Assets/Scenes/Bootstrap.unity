@@ -169,6 +169,9 @@ MonoBehaviour:
   - {fileID: 100000123}
   - {fileID: 100000143}
   - {fileID: 100000163}
+  interiorSceneName: SubmarineInterior
+  loadInteriorOnStart: 1
+  allowRestart: 1
 --- !u!1 &100000011
 GameObject:
   m_ObjectHideFlags: 0
@@ -214,6 +217,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxPlayers: 4
+  stickDeadzone: 0.2
   debugThrustForward: 0
   debugThrustBackward: 0
   debugWheel: 0
@@ -2293,7 +2297,7 @@ Transform:
   m_GameObject: {fileID: 524724733}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.95, y: 2.8529, z: 3.0333}
+  m_LocalPosition: {x: -0.95, y: 11.15, z: 3.0333}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -2842,6 +2846,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1885310471}
+  - {fileID: 2114706685}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1120822868
@@ -3464,6 +3469,68 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1915260223}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1001 &2114706684
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 1069139087}
+    m_Modifications:
+    - target: {fileID: 2250088022193215527, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0.95
+      objectReference: {fileID: 0}
+    - target: {fileID: 2250088022193215527, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 5.1499996
+      objectReference: {fileID: 0}
+    - target: {fileID: 2250088022193215527, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 3.0333
+      objectReference: {fileID: 0}
+    - target: {fileID: 2250088022193215527, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2250088022193215527, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2250088022193215527, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2250088022193215527, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2250088022193215527, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2250088022193215527, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2250088022193215527, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8841422170328135344, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+      propertyPath: m_Name
+      value: Tesoro
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+--- !u!4 &2114706685 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 2250088022193215527, guid: 83d839219b125bf4eba489208afd5286, type: 3}
+  m_PrefabInstance: {fileID: 2114706684}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

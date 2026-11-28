@@ -6,53 +6,21 @@ using SonarCrew.Core;
 namespace SonarCrew.Multiplayer
 {
     /// <summary>
-    /// Conjunto de InputAction de un slot, ya bindeadas al gamepad concreto de ese slot.
-    /// </summary>
-    public sealed class SlotInput
-    {
-        public InputAction Move;
-        public InputAction Look;
-        public InputAction Interact;
-        public InputAction Jump;
-        public InputAction Sprint;
-        public InputAction Attack;
-        public InputAction Crouch;
-        public InputAction Previous;
-        public InputAction Next;
-        // Pilotaje del submarino (hito 1): timón y palancas. Hito 2: la estación
-        // de mandos gatea por TryOccupy; aquí basta el driver del slot activo.
-        public InputAction Wheel;           // timón: yaw (eje x del stick derecho)
-        public InputAction ThrustForward;   // palanca avance (gatillo derecho)
-        public InputAction ThrustBackward;  // palanca retroceso (gatillo izquierdo)
-        public InputAction Ascend;          // palanca ascenso (D-pad arriba)
-        public InputAction Descend;         // palanca descenso (D-pad abajo)
-
-        private InputAction[] All()
-        {
-            return new[] { Move, Look, Interact, Jump, Sprint, Attack, Crouch, Previous, Next,
-                Wheel, ThrustForward, ThrustBackward, Ascend, Descend };
-        }
-
-        public void Enable()
-        {
-            foreach (InputAction action in All())
-                action?.Enable();
-        }
-
-        public void Disable()
-        {
-            foreach (InputAction action in All())
-                action?.Disable();
-        }
-    }
-
-    /// <summary>
     /// Reparte los gamepads conectados por índice de slot: el slot i usa Gamepad.all[i].
-    /// No hay soporte de teclado: cada acción se crea con el path del dispositivo asignado.
+    /// No hay soporte de teclado: cada slot lee los controles del mando que tiene
+    /// asignado.
+    /// Los controles se leen del <see cref="Gamepad"/> directamente en vez de crear
+    /// un <c>InputAction</c> por slot y por mando: crear acciones en cada reconexión
+    /// las acumulaba en el estado global del Input System y acababa lanzando
+    /// "Control count per binding cannot exceed byte.MaxValue", que además dejaba
+    /// los mandos sin actualizar.
     /// </summary>
     public class InputRouter : MonoBehaviour
     {
         [SerializeField] private int maxPlayers = 4;
+
+        [Tooltip("Zona muerta de los sticks. Sin ella, la deriva del mando mueve al tripulante solo.")]
+        [SerializeField] private float stickDeadzone = 0.2f;
 
         [Header("Depuración (solo lectura, slot 0)")]
         [SerializeField] private float debugThrustForward;
@@ -61,7 +29,6 @@ namespace SonarCrew.Multiplayer
         [SerializeField] private Vector2 debugMove;
 
         private readonly PlayerSlot[] _slots = new PlayerSlot[4];
-        private readonly SlotInput[] _inputs = new SlotInput[4];
         private readonly Gamepad[] _pads = new Gamepad[4];
 
         /// <summary>Se lanza cuando cambia el número de gamepads asignados.</summary>
@@ -93,12 +60,9 @@ namespace SonarCrew.Multiplayer
         private void OnDisable()
         {
             InputSystem.onDeviceChange -= OnDeviceChange;
-            for (int i = 0; i < _inputs.Length; i++)
-            {
-                _inputs[i]?.Disable();
-                _inputs[i] = null;
+            for (int i = 0; i < _pads.Length; i++)
                 _pads[i] = null;
-            }
+            AssignedCount = 0;
         }
 
         private void OnDeviceChange(InputDevice device, InputDeviceChange change)
@@ -120,149 +84,121 @@ namespace SonarCrew.Multiplayer
         {
             int count = Mathf.Min(Gamepad.all.Count, maxPlayers);
             AssignedCount = count;
+
             for (int i = 0; i < maxPlayers; i++)
             {
-                if (i < count)
-                {
-                    Gamepad pad = Gamepad.all[i];
-                    if (_pads[i] != pad || _inputs[i] == null)
-                    {
-                        _pads[i] = pad;
-                        _inputs[i]?.Disable();
-                        _inputs[i] = BuildSlotInput(pad);
-                        if (_slots[i] != null)
-                            _slots[i].Setup(i, pad);
-                        GameEvents.RaisePlayerDeviceAssigned(i, pad);
-                    }
-                }
-                else if (_pads[i] != null || _inputs[i] != null)
-                {
-                    _pads[i] = null;
-                    _inputs[i]?.Disable();
-                    _inputs[i] = null;
-                    if (_slots[i] != null)
-                        _slots[i].Setup(i, null);
-                }
+                Gamepad pad = i < count ? Gamepad.all[i] : null;
+                if (_pads[i] == pad) continue;
+
+                _pads[i] = pad;
+                if (_slots[i] != null)
+                    _slots[i].Setup(i, pad);
+                if (pad != null)
+                    GameEvents.RaisePlayerDeviceAssigned(i, pad);
             }
+
             DeviceListChanged?.Invoke();
         }
 
-        /// <summary>Crea las acciones del slot bindeadas al path del gamepad físico asignado.</summary>
-        private static SlotInput BuildSlotInput(Gamepad pad)
+        /// <summary>
+        /// Mando del slot, solo si sigue conectado. Un dispositivo retirado no se
+        /// puede leer: lanzaría MissingReferenceException.
+        /// </summary>
+        private Gamepad Pad(int slot)
         {
-            string p = pad.path;
-            var input = new SlotInput();
-
-            input.Move = new InputAction("Move", InputActionType.Value, expectedControlType: "Vector2");
-            input.Move.AddCompositeBinding("2DVector")
-                .With("up", p + "/leftStick/up")
-                .With("down", p + "/leftStick/down")
-                .With("left", p + "/leftStick/left")
-                .With("right", p + "/leftStick/right");
-            input.Move.AddCompositeBinding("2DVector")
-                .With("up", p + "/dpad/up")
-                .With("down", p + "/dpad/down")
-                .With("left", p + "/dpad/left")
-                .With("right", p + "/dpad/right");
-
-            input.Look = new InputAction("Look", InputActionType.Value, expectedControlType: "Vector2");
-            input.Look.AddCompositeBinding("2DVector")
-                .With("up", p + "/rightStick/up")
-                .With("down", p + "/rightStick/down")
-                .With("left", p + "/rightStick/left")
-                .With("right", p + "/rightStick/right");
-
-            input.Interact = new InputAction("Interact", InputActionType.Button, binding: p + "/buttonNorth");
-            input.Jump = new InputAction("Jump", InputActionType.Button, binding: p + "/buttonSouth");
-            input.Sprint = new InputAction("Sprint", InputActionType.Button, binding: p + "/leftStickPress");
-            input.Attack = new InputAction("Attack", InputActionType.Button, binding: p + "/buttonWest");
-            input.Crouch = new InputAction("Crouch", InputActionType.Button, binding: p + "/buttonEast");
-            input.Previous = new InputAction("Previous", InputActionType.Button, binding: p + "/dpad/left");
-            input.Next = new InputAction("Next", InputActionType.Button, binding: p + "/dpad/right");
-            input.Wheel = new InputAction("Wheel", InputActionType.Value, expectedControlType: "Axis");
-            input.Wheel.AddBinding(p + "/rightStick/x");
-            // Palancas continuas: Value + Axis para leer 0..1 analógico del gatillo,
-            // igual que el timón (un Button sobre eje analógico solo expone estados cortados).
-            input.ThrustForward = new InputAction("ThrustForward", InputActionType.Value, expectedControlType: "Axis");
-            input.ThrustForward.AddBinding(p + "/rightTrigger");
-            input.ThrustBackward = new InputAction("ThrustBackward", InputActionType.Value, expectedControlType: "Axis");
-            input.ThrustBackward.AddBinding(p + "/leftTrigger");
-            input.Ascend = new InputAction("Ascend", InputActionType.Button, binding: p + "/dpad/up");
-            input.Descend = new InputAction("Descend", InputActionType.Button, binding: p + "/dpad/down");
-
-            input.Enable();
-            return input;
+            if (slot < 0 || slot >= _pads.Length) return null;
+            Gamepad pad = _pads[slot];
+            return pad != null && pad.added ? pad : null;
         }
 
-        private SlotInput Slot(int slot)
+        /// <summary>
+        /// Zona muerta radial: con el mando parado el tripulante no debe moverse ni
+        /// girar. Lo que supera la zona muerta se reescala para no perder recorrido.
+        /// </summary>
+        private Vector2 ApplyDeadzone(Vector2 value)
         {
-            return slot >= 0 && slot < _inputs.Length ? _inputs[slot] : null;
+            float magnitude = value.magnitude;
+            if (magnitude <= stickDeadzone) return Vector2.zero;
+            return value * ((magnitude - stickDeadzone) / (magnitude * (1f - stickDeadzone)));
+        }
+
+        /// <summary>Zona muerta para un eje suelto (timón, palanca).</summary>
+        private float ApplyDeadzone(float value)
+        {
+            float magnitude = Mathf.Abs(value);
+            if (magnitude <= stickDeadzone) return 0f;
+            return Mathf.Sign(value) * ((magnitude - stickDeadzone) / (1f - stickDeadzone));
         }
 
         public Vector2 GetMove(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Move != null ? input.Move.ReadValue<Vector2>() : Vector2.zero;
+            Gamepad pad = Pad(slot);
+            if (pad == null) return Vector2.zero;
+
+            // Stick izquierdo o cruceta, como los dos composites del hito 0.
+            Vector2 stick = ApplyDeadzone(pad.leftStick.ReadValue());
+            Vector2 dpad = pad.dpad.ReadValue();
+            return Vector2.ClampMagnitude(stick + dpad, 1f);
         }
 
         public Vector2 GetLook(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Look != null ? input.Look.ReadValue<Vector2>() : Vector2.zero;
+            Gamepad pad = Pad(slot);
+            return pad != null ? ApplyDeadzone(pad.rightStick.ReadValue()) : Vector2.zero;
         }
 
         public bool GetInteractPressed(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Interact != null && input.Interact.WasPressedThisFrame();
+            Gamepad pad = Pad(slot);
+            return pad != null && pad.buttonNorth.wasPressedThisFrame;
         }
 
         public bool GetInteractHeld(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Interact != null && input.Interact.IsPressed();
+            Gamepad pad = Pad(slot);
+            return pad != null && pad.buttonNorth.isPressed;
         }
 
         public bool GetJumpPressed(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Jump != null && input.Jump.WasPressedThisFrame();
+            Gamepad pad = Pad(slot);
+            return pad != null && pad.buttonSouth.wasPressedThisFrame;
         }
 
         public bool GetSprintHeld(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Sprint != null && input.Sprint.IsPressed();
+            Gamepad pad = Pad(slot);
+            return pad != null && pad.leftStickButton.isPressed;
         }
 
         public float GetWheel(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Wheel != null ? input.Wheel.ReadValue<float>() : 0f;
+            Gamepad pad = Pad(slot);
+            return pad != null ? ApplyDeadzone(pad.rightStick.x.ReadValue()) : 0f;
         }
 
         public float GetThrustForward(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.ThrustForward != null ? input.ThrustForward.ReadValue<float>() : 0f;
+            Gamepad pad = Pad(slot);
+            return pad != null ? pad.rightTrigger.ReadValue() : 0f;
         }
 
         public float GetThrustBackward(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.ThrustBackward != null ? input.ThrustBackward.ReadValue<float>() : 0f;
+            Gamepad pad = Pad(slot);
+            return pad != null ? pad.leftTrigger.ReadValue() : 0f;
         }
 
         public bool GetAscendHeld(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Ascend != null && input.Ascend.IsPressed();
+            Gamepad pad = Pad(slot);
+            return pad != null && pad.dpad.up.isPressed;
         }
 
         public bool GetDescendHeld(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Descend != null && input.Descend.IsPressed();
+            Gamepad pad = Pad(slot);
+            return pad != null && pad.dpad.down.isPressed;
         }
 
         // --- Botones de estación (hito 2, persona B) ---
@@ -270,26 +206,26 @@ namespace SonarCrew.Multiplayer
         /// <summary>Botón oeste: accionar la estación que se está operando.</summary>
         public bool GetAttackPressed(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Attack != null && input.Attack.WasPressedThisFrame();
+            Gamepad pad = Pad(slot);
+            return pad != null && pad.buttonWest.wasPressedThisFrame;
         }
 
         public bool GetAttackHeld(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Attack != null && input.Attack.IsPressed();
+            Gamepad pad = Pad(slot);
+            return pad != null && pad.buttonWest.isPressed;
         }
 
         public bool GetPreviousPressed(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Previous != null && input.Previous.WasPressedThisFrame();
+            Gamepad pad = Pad(slot);
+            return pad != null && pad.dpad.left.wasPressedThisFrame;
         }
 
         public bool GetNextPressed(int slot)
         {
-            SlotInput input = Slot(slot);
-            return input != null && input.Next != null && input.Next.WasPressedThisFrame();
+            Gamepad pad = Pad(slot);
+            return pad != null && pad.dpad.right.wasPressedThisFrame;
         }
     }
 }
