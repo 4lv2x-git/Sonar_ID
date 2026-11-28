@@ -67,6 +67,8 @@ namespace SonarCrew.Multiplayer
         private readonly SlotInput[] _inputs = new SlotInput[4];
         private readonly Gamepad[] _pads = new Gamepad[4];
 
+        private bool _devicesDirty;
+
         /// <summary>Se lanza cuando cambia el número de gamepads asignados.</summary>
         public event Action DeviceListChanged;
 
@@ -80,6 +82,14 @@ namespace SonarCrew.Multiplayer
 
         private void Update()
         {
+            // Un mando que se reconecta lanza varios eventos seguidos y alguna vez
+            // uno por frame: el reparto se rehace una sola vez por frame.
+            if (_devicesDirty)
+            {
+                _devicesDirty = false;
+                RefreshDevices();
+            }
+
             // Solo lectura en el Inspector durante Play, para el slot 0.
             debugThrustForward = GetThrustForward(0);
             debugThrustBackward = GetThrustBackward(0);
@@ -106,8 +116,12 @@ namespace SonarCrew.Multiplayer
 
         private void OnDeviceChange(InputDevice device, InputDeviceChange change)
         {
-            if (device is Gamepad)
-                RefreshDevices();
+            if (!(device is Gamepad)) return;
+
+            // El reparto se rehace en el siguiente Update y no dentro del callback:
+            // reconectar un mando dispara Added + Enabled + ... y no hace falta
+            // reconstruir las acciones ni avisar al juego en cada evento.
+            _devicesDirty = true;
         }
 
         /// <summary>Registra los slots de la escena y fuerza el reparto de dispositivos.</summary>

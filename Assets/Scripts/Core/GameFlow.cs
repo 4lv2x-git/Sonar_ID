@@ -35,8 +35,16 @@ namespace SonarCrew.Core
         [Header("Objetivo")]
         [SerializeField] private bool allowRestart = true;
 
+        [Header("Reparto de mandos")]
+        [Tooltip("Tiempo que un mando debe estar presente (o ausente) antes de entrar o salir de la partida.")]
+        [SerializeField] private float playerSettleTime = 1.5f;
+
         public GameState State { get; private set; } = GameState.Boot;
         public int ActivePlayerCount { get; private set; }
+
+        /// <summary>Número de mandos detectado en el último muestreo estable.</summary>
+        private int _detectedPlayers = -1;
+        private float _detectedSince;
 
         private void Awake()
         {
@@ -53,8 +61,6 @@ namespace SonarCrew.Core
         private void OnDisable()
         {
             GameEvents.TreasureRecovered -= OnTreasureRecovered;
-            if (inputRouter != null)
-                inputRouter.DeviceListChanged -= RefreshSlots;
         }
 
         private void Start()
@@ -67,13 +73,45 @@ namespace SonarCrew.Core
                 Debug.LogError("GameFlow: falta la referencia a InputRouter.");
                 return;
             }
+
             inputRouter.AssignSlots(playerSlots);
-            inputRouter.DeviceListChanged += RefreshSlots;
-            RefreshSlots();
+
+            // Arranque: entran todos los mandos conectados en ese momento, sin esperas.
+            int starting = Mathf.Clamp(Gamepad.all.Count, 0, playerSlots.Length);
+            _detectedPlayers = starting;
+            _detectedSince = Time.unscaledTime;
+            ApplyActivePlayers(starting);
             State = GameState.Playing;
         }
 
         private void Update()
+        {
+            TrackPlayerCount();
+            HandleRestartInput();
+        }
+
+        /// <summary>
+        /// El reparto de pantalla solo cambia cuando el número de mandos se mantiene
+        /// estable: un mando que aparece y desaparece (reconexión inalámbrica, driver
+        /// inestable) no debe partir la pantalla ni sacar a un tripulante nuevo.
+        /// </summary>
+        private void TrackPlayerCount()
+        {
+            int detected = Mathf.Clamp(Gamepad.all.Count, 0, playerSlots.Length);
+            if (detected != _detectedPlayers)
+            {
+                _detectedPlayers = detected;
+                _detectedSince = Time.unscaledTime;
+                return;
+            }
+
+            if (detected == ActivePlayerCount) return;
+            if (Time.unscaledTime - _detectedSince < playerSettleTime) return;
+
+            ApplyActivePlayers(detected);
+        }
+
+        private void HandleRestartInput()
         {
             // Cualquier jugador activo puede pedir otra partida desde la victoria.
             if (State != GameState.Victory || !allowRestart || inputRouter == null) return;
@@ -127,13 +165,12 @@ namespace SonarCrew.Core
             SceneManager.LoadSceneAsync(interiorSceneName, LoadSceneMode.Additive);
         }
 
-        /// <summary>Activa los slots 0..N-1 según los gamepads conectados y refresca los rects.</summary>
-        private void RefreshSlots()
+        /// <summary>Activa los slots 0..N-1 y reparte la pantalla entre ellos.</summary>
+        private void ApplyActivePlayers(int active)
         {
-            int active = Mathf.Clamp(Gamepad.all.Count, 0, playerSlots.Length);
-            if (active != ActivePlayerCount)
-                Debug.Log("[SonarCrew] Jugadores activos: " + active + " (mandos: " + Gamepad.all.Count + ")");
             ActivePlayerCount = active;
+            Debug.Log("[SonarCrew] Jugadores en partida: " + active + " · mandos: " + DescribeGamepads());
+
             for (int i = 0; i < playerSlots.Length; i++)
             {
                 if (playerSlots[i] == null) continue;
@@ -147,6 +184,24 @@ namespace SonarCrew.Core
                 if (on)
                     playerSlots[i].CameraRig.ApplyLayout(i, active);
             }
+        }
+
+        /// <summary>
+        /// Mandos vistos ahora mismo, con su id de dispositivo. Sirve para identificar
+        /// el mando que aparece y desaparece cuando la pantalla se parte sola.
+        /// </summary>
+        private static string DescribeGamepads()
+        {
+            if (Gamepad.all.Count == 0) return "ninguno";
+
+            string text = string.Empty;
+            for (int i = 0; i < Gamepad.all.Count; i++)
+            {
+                Gamepad pad = Gamepad.all[i];
+                if (i > 0) text += ", ";
+                text += pad.displayName + "#" + pad.deviceId;
+            }
+            return text;
         }
     }
 }
