@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
+using SonarCrew.Environment;
 using SonarCrew.Multiplayer;
 
 namespace SonarCrew.Core
@@ -18,6 +19,8 @@ namespace SonarCrew.Core
     /// gamepads haya conectados (1-4), les aplica el layout de pantalla dividida y
     /// carga de forma aditiva el interior del submarino (`SubmarineInterior`, la
     /// escena de B) sin tocar `Bootstrap`, que es de A.
+    /// Hito 4: recuperar el único tesoro pasa la partida a victoria y cualquier
+    /// jugador puede reiniciarla desde la pantalla de resultado.
     /// </summary>
     public class GameFlow : MonoBehaviour
     {
@@ -29,6 +32,9 @@ namespace SonarCrew.Core
         [SerializeField] private string interiorSceneName = "SubmarineInterior";
         [SerializeField] private bool loadInteriorOnStart = true;
 
+        [Header("Objetivo")]
+        [SerializeField] private bool allowRestart = true;
+
         public GameState State { get; private set; } = GameState.Boot;
         public int ActivePlayerCount { get; private set; }
 
@@ -37,6 +43,18 @@ namespace SonarCrew.Core
             ServiceLocator.Register(this);
             if (inputRouter != null)
                 ServiceLocator.Register(inputRouter);
+        }
+
+        private void OnEnable()
+        {
+            GameEvents.TreasureRecovered += OnTreasureRecovered;
+        }
+
+        private void OnDisable()
+        {
+            GameEvents.TreasureRecovered -= OnTreasureRecovered;
+            if (inputRouter != null)
+                inputRouter.DeviceListChanged -= RefreshSlots;
         }
 
         private void Start()
@@ -55,10 +73,40 @@ namespace SonarCrew.Core
             State = GameState.Playing;
         }
 
-        private void OnDestroy()
+        private void Update()
         {
-            if (inputRouter != null)
-                inputRouter.DeviceListChanged -= RefreshSlots;
+            // Cualquier jugador activo puede pedir otra partida desde la victoria.
+            if (State != GameState.Victory || !allowRestart || inputRouter == null) return;
+
+            for (int i = 0; i < playerSlots.Length; i++)
+            {
+                if (playerSlots[i] == null || !playerSlots[i].IsActive) continue;
+                if (!inputRouter.GetInteractPressed(i)) continue;
+                Restart();
+                return;
+            }
+        }
+
+        private void OnTreasureRecovered(TreasureCollectible treasure)
+        {
+            if (State != GameState.Playing) return;
+
+            State = GameState.Victory;
+            Debug.Log("[Hito 4] Tesoro recuperado: victoria.");
+        }
+
+        /// <summary>Vuelve a empezar: recarga la escena de arranque (y con ella el interior).</summary>
+        public void Restart()
+        {
+            Scene current = gameObject.scene;
+            if (!current.IsValid() || !Application.CanStreamedLevelBeLoaded(current.name))
+            {
+                Debug.LogWarning("GameFlow: la escena de arranque no está en Build Settings; no se puede reiniciar.");
+                return;
+            }
+
+            ServiceLocator.Clear();
+            SceneManager.LoadScene(current.name, LoadSceneMode.Single);
         }
 
         /// <summary>Carga el interior una sola vez y de forma aditiva.</summary>

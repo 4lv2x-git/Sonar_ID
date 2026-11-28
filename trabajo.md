@@ -1,7 +1,7 @@
 # trabajo.md — Reparto de trabajo por hitos
 
 Documento operativo para dos personas (o dos agentes) trabajando en paralelo sobre Sonar Submarine Crew.
-Última actualización: 2026-11-26.
+Última actualización: 2026-11-28.
 
 - `README.md` es la especificación de producto.
 - `AGENTS.md` contiene las decisiones técnicas, la arquitectura y los hitos oficiales (0–7).
@@ -30,9 +30,9 @@ Reglas de convivencia:
 |---|---|---|---|
 | 0 — Base | A + B | Hecho (`260f1aa`) | `Bootstrap` con 4 slots, cámaras divididas, tripulante y casco estático |
 | 1 — Submarino | A | Hecho | `SubmarineProxy`, `SubmarineFrame`, `ISubmarinePose`, rebase, confines y sonda en coordenadas de mapa; herramienta de Editor de montaje |
-| 2 — Estaciones y salas | B | Pendiente | Ya existen `IStation` y la ocupación básica en `CrewController`; faltan `StationBase`, `PowerSystem` y las cinco salas |
+| 2 — Estaciones y salas | B | Hecho (`8e311fd`, en `main` por `4ada732`) | `StationBase`, `PowerSystem`, las cinco salas, las nueve estaciones y HUD por jugador; herramienta de Editor `SubmarineInteriorBuilder` |
 | 3 — Navegación | A | Pendiente | |
-| 4 — Objetivo | B | Pendiente | |
+| 4 — Objetivo | B | Hecho en rama `Hito-4` (sin fusionar) | Gancho con cabestrante y cámara de baja calidad (`RenderTexture`), pantalla en la estación, tesoro único, victoria y reinicio; herramienta de Editor `Hito4Setup` |
 | 5 — Daños | B | Pendiente | |
 | 6a — Entorno | A | Pendiente | |
 | 6b — Pulido, HUD y audio | B | Pendiente | Bloqueado por el hito 3 de A para los *blips* |
@@ -50,7 +50,8 @@ El hito 0 ya dejó parte del contrato. Lo que falta se enumera aquí; es lo prim
 | `IPowerState` | Existe | A | `SubmarineMotor` | `HasPower` + `PowerChanged` |
 | `PowerStateStub` | Existe | A | — | Siempre con energía; B lo sustituye en el hito 2 por `PowerSystem` |
 | `PowerSystem` | Pendiente (hito 2) | B | A, estaciones | Implementa `IPowerState` |
-| `GameEvents` | Existe | Compartido | Ambos | Solo cambios aditivos; hoy tiene jugador, estación, `HullImpacted`, fugas y alarma |
+| `GameEvents` | Existe | Compartido | Ambos | Solo cambios aditivos; hoy tiene jugador, estación, `HullImpacted`, fugas, alarma y `TreasureRecovered` (hito 4) |
+| `TreasureCollectible` + `GameEvents.TreasureRecovered` | Existe (hito 4) | B | `GrappleHook`, `GameFlow` | Tesoro único bajo `WorldRoot`; se registra en el `ServiceLocator` para que el gancho lo resuelva |
 | `HullZone` / `DamageLevel` | Existen (`Core/GameTypes.cs`) | B | `DamageSystem`, A | No mover de sitio; A los lee |
 | `SonarContact` + evento de contactos | Pendiente (hito 3) | A | B (HUD) | Struct + lista inmutable por emisión |
 | `ISubmarinePose` | Existe | A | B (2, 4, 6b) | `MapPosition`, `Yaw`, `Velocity`, `WorldToSubmarine`, `SubmarineToWorld` |
@@ -97,7 +98,7 @@ Hitos oficiales: **2, 4, 5, 6b, 7b**. Orden interno obligatorio: **2 → 4 → 5
 
 Notas del hito 2: `CrewController` ya detecta estación cercana y pide ocupación; `StationBase` debe ser quien arbitre el dueño único y libere al alejarse. `PowerSystem` implementa `IPowerState` y decide qué estaciones quedan sin energía.
 
-Notas del hito 4: el gancho vive en el interior estático; alcance y distancia se calculan con `ISubmarinePose.WorldToSubmarine`. El tesoro cuelga de `WorldRoot`.
+Notas del hito 4 (cerrado el 2026-11-28, rama `Hito-4`): el gancho (`GrappleHook`) es equipo del casco y cuelga por debajo del suelo en el marco estático del interior, como el periscopio: nada se parenta a un transform móvil (§3.1). Por eso la captura se mide en el mundo dibujado entre la punta del gancho y el cofre, sin depender de `ISubmarinePose`. La estación manda en remoto (stick derecho ajusta el cable, `[X]` suelta/iza del todo) y reproduce la cámara de baja calidad del gancho en la pantalla del puesto (`RenderTexture` 256×160, máscara `World`/`Hazard`). El tesoro cuelga de `WorldRoot` y `Hito4Setup` lo coloca bajo el gancho usando la traslación entre el marco del casco y el del mapa. El reinicio recarga la escena de arranque, así que `Bootstrap` debe estar en Build Settings (lo añade la herramienta).
 
 Notas del hito 5: `DamageSystem` se añade al prefab `SubmarineProxy` (propiedad de A; se coordina la edición del prefab). Los cinco efectos se gatean desde `DamageSystem`/`IntegrityState`, no desde cada estación.
 

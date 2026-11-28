@@ -37,6 +37,13 @@ namespace SonarCrew.EditorTools
         private const float CorridorHalfWidth = 3.5f;
         private const float HullInner = 19.5f;
 
+        // Hito 4: el gancho arranca justo debajo del suelo del casco (el forjado
+        // ocupa de y = -1 a y = 0) y llega al fondo placeholder del mapa.
+        private const float HookDropBelowFloor = -1.05f;
+        private const float HookMaxDepth = 7.5f;
+        private const float HookWinchSpeed = 2.5f;
+        private const float HookCaptureRadius = 1.2f;
+
         private enum StationKind
         {
             Wheel,
@@ -120,7 +127,7 @@ namespace SonarCrew.EditorTools
 
                 BuildWalls(structure, palette.Wall);
                 BuildRooms(roomsRoot, root.transform, palette, prefabs);
-                PowerSystem powerSystem = BuildSystems(systems);
+                PowerSystem powerSystem = BuildSystems(systems, palette);
                 WireEngineRoom(roomsRoot, systems, powerSystem);
 
                 if (!EditorSceneManager.SaveScene(scene, InteriorScenePath))
@@ -407,7 +414,7 @@ namespace SonarCrew.EditorTools
 
         // ------------------------------------------------------------- sistemas
 
-        private static PowerSystem BuildSystems(Transform systems)
+        private static PowerSystem BuildSystems(Transform systems, Palette palette)
         {
             GameObject powerObject = new GameObject("RedElectrica");
             powerObject.transform.SetParent(systems, false);
@@ -424,7 +431,77 @@ namespace SonarCrew.EditorTools
             hudObject.transform.SetParent(systems, false);
             hudObject.AddComponent<StationHudInstaller>();
 
+            // Hito 4: el gancho es equipo del casco y cuelga por debajo del suelo,
+            // en el marco estático del interior (nunca de un transform móvil).
+            BuildGrappleRig(systems, palette);
+
             return powerSystem;
+        }
+
+        /// <summary>
+        /// Gancho del hito 4: cable, punta y cámara de baja calidad por debajo del
+        /// suelo del casco. La estación de la sala del gancho lo acciona en remoto y
+        /// reproduce su cámara en la pantalla del puesto.
+        /// </summary>
+        private static void BuildGrappleRig(Transform systems, Palette palette)
+        {
+            GameObject rig = new GameObject("GanchoRecolector");
+            rig.transform.SetParent(systems, false);
+            rig.transform.localPosition = new Vector3(0f, HookDropBelowFloor, 0f);
+            GrappleHook hook = rig.AddComponent<GrappleHook>();
+
+            GameObject cable = CreateBox(rig.transform, "Cable", new Vector3(0f, -HookMaxDepth * 0.5f, 0f),
+                new Vector3(0.06f, HookMaxDepth, 0.06f), Quaternion.identity, palette.Accent);
+
+            GameObject head = new GameObject("Punta");
+            head.transform.SetParent(rig.transform, false);
+            head.transform.localPosition = new Vector3(0f, -HookMaxDepth, 0f);
+            CreateBox(head.transform, "Garfio", new Vector3(0f, -0.05f, 0f), new Vector3(0.3f, 0.2f, 0.3f), Quaternion.identity, palette.Body);
+            CreateBox(head.transform, "PuaA", new Vector3(-0.16f, -0.22f, 0f), new Vector3(0.06f, 0.24f, 0.06f), Quaternion.Euler(0f, 0f, -25f), palette.Accent);
+            CreateBox(head.transform, "PuaB", new Vector3(0.16f, -0.22f, 0f), new Vector3(0.06f, 0.24f, 0.06f), Quaternion.Euler(0f, 0f, 25f), palette.Accent);
+
+            GameObject cameraObject = new GameObject("CamaraGancho", typeof(Camera));
+            cameraObject.transform.SetParent(head.transform, false);
+            cameraObject.transform.localPosition = new Vector3(0f, -0.25f, 0f);
+            cameraObject.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            Camera feedCamera = cameraObject.GetComponent<Camera>();
+            feedCamera.enabled = false;
+            feedCamera.fieldOfView = 65f;
+            feedCamera.nearClipPlane = 0.05f;
+            feedCamera.farClipPlane = 200f;
+
+            // El gancho no es física: los primitivos traen collider y no debe chocar.
+            foreach (Collider collider in rig.GetComponentsInChildren<Collider>(true))
+                Object.DestroyImmediate(collider);
+
+            SerializedObject serialized = new SerializedObject(hook);
+            serialized.FindProperty("cable").objectReferenceValue = cable.transform;
+            serialized.FindProperty("hookHead").objectReferenceValue = head.transform;
+            serialized.FindProperty("feedCamera").objectReferenceValue = feedCamera;
+            serialized.FindProperty("maxDepth").floatValue = HookMaxDepth;
+            serialized.FindProperty("winchSpeed").floatValue = HookWinchSpeed;
+            serialized.FindProperty("captureRadius").floatValue = HookCaptureRadius;
+            SetLayerMask(serialized, "worldMask", new[] { "World", "Hazard" });
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>Escribe una máscara de capas por nombre (el campo se serializa como m_Bits).</summary>
+        private static void SetLayerMask(SerializedObject serialized, string fieldName, string[] layerNames)
+        {
+            SerializedProperty property = serialized.FindProperty(fieldName + ".m_Bits") ?? serialized.FindProperty(fieldName);
+            if (property == null)
+            {
+                Debug.LogWarning("[Hito 4] Máscara no encontrada: " + fieldName);
+                return;
+            }
+
+            int mask = 0;
+            foreach (string layerName in layerNames)
+            {
+                int layer = LayerMask.NameToLayer(layerName);
+                if (layer >= 0) mask |= 1 << layer;
+            }
+            property.intValue = mask;
         }
 
         private static void WireEngineRoom(Transform roomsRoot, Transform systems, PowerSystem powerSystem)
@@ -679,13 +756,15 @@ namespace SonarCrew.EditorTools
             CreateCylinder(root.transform, "Tambor", new Vector3(0f, 1f, 0f), new Vector3(0.9f, 0.8f, 0.9f), new Quaternion(0f, 0f, 0.7071f, 0.7071f), palette.Accent);
             CreateBox(root.transform, "Consola", new Vector3(0f, 1.1f, 0.7f), new Vector3(0.9f, 0.2f, 0.4f), Quaternion.identity, palette.Accent);
 
-            GameObject hook = new GameObject("Gancho");
-            hook.transform.SetParent(root.transform, false);
-            hook.transform.localPosition = new Vector3(0f, 0.5f, 0f);
-            CreateBox(hook.transform, "Cable", new Vector3(0f, -0.25f, 0f), new Vector3(0.06f, 0.5f, 0.06f), Quaternion.identity, palette.Accent);
-            CreateBox(hook.transform, "Garfio", new Vector3(0f, -0.6f, 0f), new Vector3(0.3f, 0.4f, 0.3f), Quaternion.identity, palette.Body);
+            // Hito 4: la pantalla reproduce la cámara de baja calidad del gancho. El
+            // cable y el garfio ya no viven en este puesto: cuelgan por debajo del
+            // casco (GanchoRecolector) y esta estación los manda en remoto.
+            CreateBox(root.transform, "SoportePantalla", new Vector3(0f, 1.55f, 0.52f), new Vector3(0.1f, 0.9f, 0.1f), Quaternion.identity, palette.Body);
+            CreateBox(root.transform, "MarcoPantalla", new Vector3(0f, 1.95f, 0.45f), new Vector3(1.6f, 0.95f, 0.08f), Quaternion.identity, palette.Body);
+            GameObject screen = CreateBox(root.transform, "PantallaGancho", new Vector3(0f, 1.95f, 0.5f),
+                new Vector3(1.45f, 0.82f, 0.02f), Quaternion.Euler(10f, 0f, 0f), palette.Screen);
 
-            SetObjectField(station, "hook", hook.transform);
+            SetObjectField(station, "monitorRenderer", screen.GetComponent<Renderer>());
             return root;
         }
 

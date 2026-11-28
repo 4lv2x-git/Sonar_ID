@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using SonarCrew.Environment;
 using SonarCrew.Multiplayer;
 using SonarCrew.Stations;
 
@@ -24,6 +25,14 @@ namespace SonarCrew.Core
         public static event Action<HullZone> LeakOpened;
         public static event Action<HullZone> LeakClosed;
         public static event Action AlarmRaised;
+
+        /// <summary>Objetivo cumplido: el gancho ha recuperado el tesoro (hito 4).</summary>
+        public static event Action<TreasureCollectible> TreasureRecovered;
+
+        public static void RaiseTreasureRecovered(TreasureCollectible treasure)
+        {
+            TreasureRecovered?.Invoke(treasure);
+        }
 
         public static void RaiseHullImpacted(float impulse, Vector3 point, HullZone zone, DamageLevel level)
         {
