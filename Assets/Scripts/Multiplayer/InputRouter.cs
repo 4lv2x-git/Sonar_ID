@@ -54,6 +54,9 @@ namespace SonarCrew.Multiplayer
     {
         [SerializeField] private int maxPlayers = 4;
 
+        [Tooltip("Zona muerta de los sticks. Sin ella, la deriva del mando mueve al tripulante solo.")]
+        [SerializeField] private float stickDeadzone = 0.2f;
+
         [Header("Depuración (solo lectura, slot 0)")]
         [SerializeField] private float debugThrustForward;
         [SerializeField] private float debugThrustBackward;
@@ -199,16 +202,35 @@ namespace SonarCrew.Multiplayer
             return slot >= 0 && slot < _inputs.Length ? _inputs[slot] : null;
         }
 
+        /// <summary>
+        /// Zona muerta radial: con el mando parado el tripulante no debe moverse ni
+        /// girar. Lo que supera la zona muerta se reescala para no perder recorrido.
+        /// </summary>
+        private Vector2 ApplyDeadzone(Vector2 value)
+        {
+            float magnitude = value.magnitude;
+            if (magnitude <= stickDeadzone) return Vector2.zero;
+            return value * ((magnitude - stickDeadzone) / (magnitude * (1f - stickDeadzone)));
+        }
+
+        /// <summary>Zona muerta para un eje suelto (timón, palanca).</summary>
+        private float ApplyDeadzone(float value)
+        {
+            float magnitude = Mathf.Abs(value);
+            if (magnitude <= stickDeadzone) return 0f;
+            return Mathf.Sign(value) * ((magnitude - stickDeadzone) / (1f - stickDeadzone));
+        }
+
         public Vector2 GetMove(int slot)
         {
             SlotInput input = Slot(slot);
-            return input != null && input.Move != null ? input.Move.ReadValue<Vector2>() : Vector2.zero;
+            return input != null && input.Move != null ? ApplyDeadzone(input.Move.ReadValue<Vector2>()) : Vector2.zero;
         }
 
         public Vector2 GetLook(int slot)
         {
             SlotInput input = Slot(slot);
-            return input != null && input.Look != null ? input.Look.ReadValue<Vector2>() : Vector2.zero;
+            return input != null && input.Look != null ? ApplyDeadzone(input.Look.ReadValue<Vector2>()) : Vector2.zero;
         }
 
         public bool GetInteractPressed(int slot)
@@ -238,7 +260,7 @@ namespace SonarCrew.Multiplayer
         public float GetWheel(int slot)
         {
             SlotInput input = Slot(slot);
-            return input != null && input.Wheel != null ? input.Wheel.ReadValue<float>() : 0f;
+            return input != null && input.Wheel != null ? ApplyDeadzone(input.Wheel.ReadValue<float>()) : 0f;
         }
 
         public float GetThrustForward(int slot)

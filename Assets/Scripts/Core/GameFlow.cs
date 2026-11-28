@@ -131,6 +131,8 @@ namespace SonarCrew.Core
         private void RefreshSlots()
         {
             int active = Mathf.Clamp(Gamepad.all.Count, 0, playerSlots.Length);
+            if (active != ActivePlayerCount)
+                Debug.Log("[SonarCrew] Jugadores activos: " + active + " (mandos: " + Gamepad.all.Count + ")");
             ActivePlayerCount = active;
             for (int i = 0; i < playerSlots.Length; i++)
             {

@@ -6,15 +6,14 @@ namespace SonarCrew.Stations
 {
     /// <summary>
     /// Estación de la sala del gancho (hito 4). No mueve el gancho en el interior:
-    /// manda sobre el <see cref="GrappleHook"/> que cuelga por debajo del casco y
-    /// muestra su cámara de baja calidad en la pantalla del puesto. Con daño grave
-    /// el gancho se retrae solo y la estación queda fuera de servicio (README).
+    /// manda sobre el <see cref="GrappleHook"/> que cuelga por debajo del casco y,
+    /// como el periscopio, cede la vista del ocupante a la cámara fija del gancho
+    /// (sin rotación: el jugador solo acciona el cabestrante). Con daño grave el
+    /// gancho se retrae solo y la estación queda fuera de servicio (README).
     /// </summary>
     public class GrappleStation : StationBase
     {
         [Header("Gancho")]
-        [Tooltip("Pantalla que reproduce la cámara del gancho.")]
-        [SerializeField] private Renderer monitorRenderer;
         [Tooltip("Opcional: si se deja vacío se resuelve por el ServiceLocator.")]
         [SerializeField] private GrappleHook hook;
 
@@ -22,10 +21,6 @@ namespace SonarCrew.Stations
         [Tooltip("Zona muerta del stick derecho para soltar o recoger cable.")]
         [SerializeField] private float stickDeadzone = 0.2f;
 
-        private static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
-        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
-
-        private MaterialPropertyBlock _monitorBlock;
 
         /// <summary>Profundidad automática pedida con el botón de accionar (<0 = apagada).</summary>
         private float _autoDepth = -1f;
@@ -66,24 +61,30 @@ namespace SonarCrew.Stations
 
         protected override void OnStationStart()
         {
-            ApplyMonitorFeed();
-            if (Hook == null)
-                Debug.LogWarning("GrappleStation: no hay GrappleHook en la escena; el gancho no se puede accionar.");
+            if (Hook != null) return;
+            Debug.LogWarning("GrappleStation: no hay GrappleHook en la escena; el gancho no se puede accionar.");
         }
 
         protected override void OnOccupied(CrewController crew)
         {
-            // La cámara del gancho solo se renderiza mientras alguien mira la pantalla.
+            // Igual que el periscopio: la vista del gancho sustituye la del tripulante
+            // en su rect de pantalla dividida mientras ocupa la estación.
             GrappleHook rig = Hook;
-            if (rig != null)
-                rig.SetFeedEnabled(true);
-            ApplyMonitorFeed();
+            Camera crewCamera = crew != null ? crew.CrewCamera : null;
+            if (rig == null || crewCamera == null) return;
+
+            Camera view = rig.ViewCamera;
+            if (view == null) return;
+
+            view.rect = crewCamera.rect;
+            view.depth = crewCamera.depth + 10;
+            rig.SetCameraEnabled(true);
         }
 
         protected override void OnReleased(CrewController crew)
         {
             if (Hook != null)
-                Hook.SetFeedEnabled(false);
+                Hook.SetCameraEnabled(false);
             _autoDepth = -1f;
         }
 
@@ -119,11 +120,10 @@ namespace SonarCrew.Stations
             if (level < DamageLevel.Grave) return;
 
             _autoDepth = -1f;
-            if (Hook != null)
-            {
-                Hook.Retract();
-                Hook.SetFeedEnabled(false);
-            }
+            if (Hook == null) return;
+
+            Hook.Retract();
+            Hook.SetCameraEnabled(false);
         }
 
         /// <summary>Lleva el cable hacia la profundidad pedida con [X], a velocidad de cabestrante.</summary>
@@ -139,21 +139,6 @@ namespace SonarCrew.Stations
             }
 
             rig.Drive(Mathf.Sign(delta));
-        }
-
-        /// <summary>Pinta la señal del gancho en la pantalla del puesto.</summary>
-        private void ApplyMonitorFeed()
-        {
-            if (monitorRenderer == null) return;
-
-            RenderTexture feed = Hook != null ? Hook.FeedTexture : null;
-            if (feed == null) return;
-
-            _monitorBlock ??= new MaterialPropertyBlock();
-            monitorRenderer.GetPropertyBlock(_monitorBlock);
-            _monitorBlock.SetTexture(BaseMapId, feed);
-            _monitorBlock.SetColor(BaseColorId, Color.white);
-            monitorRenderer.SetPropertyBlock(_monitorBlock);
         }
     }
 }

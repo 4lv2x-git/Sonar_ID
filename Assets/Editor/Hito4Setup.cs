@@ -25,10 +25,13 @@ namespace SonarCrew.EditorTools
         private const string TreasurePrefabPath = "Assets/Prefabs/Treasure.prefab";
         private const string TreasureMaterialPath = "Assets/Materials/World/Treasure.mat";
         private const string TreasureRootName = "Tesoro";
-        private const string GroundPath = "WorldPlaceholder/Ground";
 
-        /// <summary>Cota del centro del cofre sobre el fondo del mapa.</summary>
-        private const float TreasureHeight = 0.35f;
+        /// <summary>
+        /// Metros por debajo del casco a los que aparece el cofre. El gancho llega a
+        /// 7,5 m y captura a 1,2 m, así que a esta cota siempre es alcanzable aunque
+        /// el fondo del mapa quede más abajo.
+        /// </summary>
+        private const float TreasureDepthBelowHull = 6f;
 
         [MenuItem("SonarCrew/Hito 4 (persona B)/Montar escena", false, 40)]
         public static void Setup()
@@ -39,7 +42,7 @@ namespace SonarCrew.EditorTools
                 return;
             }
 
-            // El gancho y la pantalla viven en la escena del interior (hito 2).
+            // El gancho vive con las estaciones, en la escena del interior (hito 2).
             SubmarineInteriorBuilder.BuildInterior();
 
             Scene scene = EditorSceneManager.GetActiveScene();
@@ -61,17 +64,11 @@ namespace SonarCrew.EditorTools
             }
 
             Transform worldRoot = worldRootObject.transform;
-            Transform ground = worldRoot.Find(GroundPath);
-            if (ground == null)
-            {
-                Debug.LogError("[Hito 4] No se encontró " + GroundPath + " bajo el WorldRoot. Abortado.");
-                return;
-            }
 
             GameObject treasurePrefab = EnsureTreasurePrefab();
             if (treasurePrefab == null) return;
 
-            PlaceTreasure(worldRoot, ground, submarine.transform.position, treasurePrefab);
+            PlaceTreasure(worldRoot, submarine.transform.position, treasurePrefab);
             EnsureSceneInBuildSettings(BootstrapPath);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -84,11 +81,10 @@ namespace SonarCrew.EditorTools
 
         /// <summary>
         /// Cuelga el tesoro del WorldRoot justo debajo del gancho. El casco se dibuja
-        /// en el origen y el mundo con la pose inversa del proxy, así que la
-        /// coordenada de mapa que queda bajo el gancho es la posición de arranque
-        /// del proxy en horizontal y la cota del fondo en vertical.
+        /// en el origen y el mundo con la pose inversa del proxy, así que una cota
+        /// dibujada D corresponde a la coordenada local D + posición del proxy.
         /// </summary>
-        private static void PlaceTreasure(Transform worldRoot, Transform ground, Vector3 spawn, GameObject prefab)
+        private static void PlaceTreasure(Transform worldRoot, Vector3 spawn, GameObject prefab)
         {
             Transform existing = worldRoot.Find(TreasureRootName);
             if (existing != null)
@@ -96,7 +92,7 @@ namespace SonarCrew.EditorTools
 
             GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, worldRoot);
             instance.name = TreasureRootName;
-            instance.transform.localPosition = new Vector3(spawn.x, ground.localPosition.y + TreasureHeight, spawn.z);
+            instance.transform.localPosition = new Vector3(spawn.x, spawn.y - TreasureDepthBelowHull, spawn.z);
             instance.transform.localRotation = Quaternion.identity;
         }
 

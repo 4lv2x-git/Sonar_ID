@@ -6,9 +6,9 @@ namespace SonarCrew.Stations
 {
     /// <summary>
     /// Gancho recolector (hito 4). Es equipo del casco y vive en el marco estático
-    /// del interior, igual que el periscopio: cuelga por debajo del suelo y el mundo
-    /// se desplaza a su alrededor. La estación de la sala del gancho solo lo acciona
-    /// en remoto; el cable, la punta y la cámara de baja calidad están aquí.
+    /// del interior, como el periscopio: cuelga por debajo del suelo y el mundo se
+    /// desplaza a su alrededor. La estación de la sala del gancho lo acciona en
+    /// remoto y cede su vista al ocupante a través de <see cref="ViewCamera"/>.
     /// Captura el único tesoro del mapa cuando la punta entra en su radio.
     /// </summary>
     public class GrappleHook : MonoBehaviour
@@ -16,11 +16,11 @@ namespace SonarCrew.Stations
         [Header("Geometría")]
         [SerializeField] private Transform cable;
         [SerializeField] private Transform hookHead;
-        [SerializeField] private float cableWidth = 0.06f;
+        [SerializeField] private float cableWidth = 0.1f;
 
         [Header("Cabestrante")]
         [Tooltip("Metros de cable disponibles desde el origen del gancho.")]
-        [SerializeField] private float maxDepth = 8f;
+        [SerializeField] private float maxDepth = 7.5f;
         [SerializeField] private float winchSpeed = 2.5f;
 
         [Header("Captura")]
@@ -28,28 +28,21 @@ namespace SonarCrew.Stations
         [Tooltip("Opcional: si se deja vacío se resuelve por el ServiceLocator.")]
         [SerializeField] private TreasureCollectible treasure;
 
-        [Header("Cámara de baja calidad")]
-        [SerializeField] private Camera feedCamera;
-        [Tooltip("Opcional: si se deja vacío se crea una RenderTexture pequeña al arrancar.")]
-        [SerializeField] private RenderTexture feedTexture;
-        [Tooltip("Solo mapa y hazards: el interior y el casco nunca entran en la máscara.")]
+        [Header("Cámara")]
+        [Tooltip("Vista fija bajo el casco: muestra el cable, la punta y el fondo.")]
+        [SerializeField] private Camera viewCamera;
+        [Tooltip("Mapa, hazards y el propio gancho. El interior nunca entra en la máscara.")]
         [SerializeField] private LayerMask worldMask;
 
-        /// <summary>Resolución de la señal del gancho: deliberadamente mala (README).</summary>
-        private const int FeedWidth = 256;
-        private const int FeedHeight = 160;
-
-        private RenderTexture _runtimeFeed;
         private float _depth;
 
         public float Depth => _depth;
         public float MaxDepth => maxDepth;
         public float Depth01 => maxDepth > 0.0001f ? _depth / maxDepth : 0f;
 
-        /// <summary>Imagen que consume la pantalla de la estación del gancho.</summary>
-        public RenderTexture FeedTexture => feedTexture != null ? feedTexture : _runtimeFeed;
+        public Camera ViewCamera => viewCamera;
 
-        public bool FeedEnabled => feedCamera != null && feedCamera.enabled;
+        public bool CameraEnabled => viewCamera != null && viewCamera.enabled;
 
         private TreasureCollectible Treasure
         {
@@ -65,17 +58,21 @@ namespace SonarCrew.Stations
         {
             // Equipo de la estación: se resuelve por el localizador, como las estaciones.
             ServiceLocator.Register(this);
-            EnsureFeed();
             ApplyGeometry();
-        }
 
-        private void OnDestroy()
-        {
-            if (_runtimeFeed == null) return;
-            if (feedCamera != null && feedCamera.targetTexture == _runtimeFeed)
-                feedCamera.targetTexture = null;
-            _runtimeFeed.Release();
-            Destroy(_runtimeFeed);
+            // La cámara la enciende la estación mientras su ocupante mira el gancho.
+            if (viewCamera == null) return;
+
+            int hullLayer = MaskOf("HullProxy");
+            if (worldMask == 0)
+                worldMask = MaskOf("World") | MaskOf("Hazard") | hullLayer;
+            else
+                worldMask |= hullLayer; // el propio gancho siempre se ve en su cámara
+
+            viewCamera.cullingMask = worldMask;
+            viewCamera.allowHDR = false;
+            viewCamera.allowMSAA = false;
+            viewCamera.enabled = false;
         }
 
         private void Update()
@@ -103,10 +100,10 @@ namespace SonarCrew.Stations
         public void Retract() => SetDepth(0f);
 
         /// <summary>Enciende o apaga la cámara: solo se renderiza mientras alguien mira.</summary>
-        public void SetFeedEnabled(bool enabled)
+        public void SetCameraEnabled(bool enabled)
         {
-            if (feedCamera != null)
-                feedCamera.enabled = enabled;
+            if (viewCamera != null)
+                viewCamera.enabled = enabled;
         }
 
         /// <summary>
@@ -147,31 +144,6 @@ namespace SonarCrew.Stations
 
             if (hookHead != null)
                 hookHead.localPosition = new Vector3(0f, -_depth, 0f);
-        }
-
-        private void EnsureFeed()
-        {
-            if (feedCamera == null) return;
-
-            if (worldMask == 0)
-                worldMask = MaskOf("World") | MaskOf("Hazard");
-
-            if (feedTexture == null && _runtimeFeed == null)
-            {
-                _runtimeFeed = new RenderTexture(FeedWidth, FeedHeight, 16)
-                {
-                    name = "GrappleFeed",
-                    filterMode = FilterMode.Point,
-                    wrapMode = TextureWrapMode.Clamp
-                };
-                _runtimeFeed.Create();
-            }
-
-            feedCamera.targetTexture = FeedTexture;
-            feedCamera.cullingMask = worldMask;
-            feedCamera.allowHDR = false;
-            feedCamera.allowMSAA = false;
-            feedCamera.enabled = false;
         }
 
         /// <summary>Máscara de una capa del proyecto; 0 si la capa no existe.</summary>
