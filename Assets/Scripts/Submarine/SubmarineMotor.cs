@@ -84,16 +84,26 @@ namespace SonarCrew.Submarine
             float vertical = 0f;
             float wheel = 0f;
 
-            if (HasPower && ServiceLocator.TryGet(out InputRouter router))
+            if (HasPower)
             {
-                // Hito 1: el driver del slot pilota directamente. Hito 2: la estación
-                // de mandos gateará el pilotaje tras TryOccupy.
-                float forward = router.GetThrustForward(driverSlot);
-                float backward = router.GetThrustBackward(driverSlot);
-                thrust = forward - backward;
-                if (router.GetAscendHeld(driverSlot)) vertical += 1f;
-                if (router.GetDescendHeld(driverSlot)) vertical -= 1f;
-                wheel = router.GetWheel(driverSlot);
+                if (ServiceLocator.TryGet(out ISubmarineControls controls))
+                {
+                    // Hito 2: el pilotaje llega de las estaciones de mandos
+                    // (timón y palancas) a través del estado de mandos.
+                    thrust = controls.Throttle;
+                    vertical = controls.Vertical;
+                    wheel = controls.Steer;
+                }
+                else if (ServiceLocator.TryGet(out InputRouter router))
+                {
+                    // Sin estaciones montadas (pruebas sueltas del hito 1): pilotaje directo.
+                    float forward = router.GetThrustForward(driverSlot);
+                    float backward = router.GetThrustBackward(driverSlot);
+                    thrust = forward - backward;
+                    if (router.GetAscendHeld(driverSlot)) vertical += 1f;
+                    if (router.GetDescendHeld(driverSlot)) vertical -= 1f;
+                    wheel = router.GetWheel(driverSlot);
+                }
             }
 
             ApplyThrust(thrust, vertical);

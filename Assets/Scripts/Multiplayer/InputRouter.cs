@@ -264,5 +264,32 @@ namespace SonarCrew.Multiplayer
             SlotInput input = Slot(slot);
             return input != null && input.Descend != null && input.Descend.IsPressed();
         }
+
+        // --- Botones de estación (hito 2, persona B) ---
+
+        /// <summary>Botón oeste: accionar la estación que se está operando.</summary>
+        public bool GetAttackPressed(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.Attack != null && input.Attack.WasPressedThisFrame();
+        }
+
+        public bool GetAttackHeld(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.Attack != null && input.Attack.IsPressed();
+        }
+
+        public bool GetPreviousPressed(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.Previous != null && input.Previous.WasPressedThisFrame();
+        }
+
+        public bool GetNextPressed(int slot)
+        {
+            SlotInput input = Slot(slot);
+            return input != null && input.Next != null && input.Next.WasPressedThisFrame();
+        }
     }
 }
