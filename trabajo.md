@@ -31,10 +31,10 @@ Reglas de convivencia:
 | 0 — Base | A + B | Hecho (`260f1aa`) | `Bootstrap` con 4 slots, cámaras divididas, tripulante y casco estático |
 | 1 — Submarino | A | Hecho | `SubmarineProxy`, `SubmarineFrame`, `ISubmarinePose`, rebase, confines y sonda en coordenadas de mapa; herramienta de Editor de montaje |
 | 2 — Estaciones y salas | B | Pendiente | Ya existen `IStation` y la ocupación básica en `CrewController`; faltan `StationBase`, `PowerSystem` y las cinco salas |
-| 3 — Navegación | A | Pendiente | |
+| 3 — Navegación | A | Hecho (sistema; HUD de B en 6b) | `SonarSystem`, `SonarContact`, evento de contactos y `NavigationSystem` |
 | 4 — Objetivo | B | Pendiente | |
 | 5 — Daños | B | Pendiente | |
-| 6a — Entorno | A | Pendiente | |
+| 6a — Entorno | A | En curso | Mapa `SubmarineTest` generado (rocas, columnas, arcos, corrientes y minas); falta validación y pulido |
 | 6b — Pulido, HUD y audio | B | Pendiente | Bloqueado por el hito 3 de A para los *blips* |
 | 7a — PlayMode y playtest | A | Pendiente | |
 | 7b — EditMode de reglas | B | Pendiente | |
@@ -52,7 +52,7 @@ El hito 0 ya dejó parte del contrato. Lo que falta se enumera aquí; es lo prim
 | `PowerSystem` | Pendiente (hito 2) | B | A, estaciones | Implementa `IPowerState` |
 | `GameEvents` | Existe | Compartido | Ambos | Solo cambios aditivos; hoy tiene jugador, estación, `HullImpacted`, fugas y alarma |
 | `HullZone` / `DamageLevel` | Existen (`Core/GameTypes.cs`) | B | `DamageSystem`, A | No mover de sitio; A los lee |
-| `SonarContact` + evento de contactos | Pendiente (hito 3) | A | B (HUD) | Struct + lista inmutable por emisión |
+| `SonarContact` + evento de contactos | Existe | A | B (HUD) | Struct + lista inmutable por emisión |
 | `ISubmarinePose` | Existe | A | B (2, 4, 6b) | `MapPosition`, `Yaw`, `Velocity`, `WorldToSubmarine`, `SubmarineToWorld` |
 | `SubmarineFrame` + `WorldRoot` | Existe | A | B | Pose inversa y rebase; única autoridad del `WorldRoot` |
 | `SubmarineProxy` con collider por sala | Existe | A | B (hito 5) | Cada collider hijo con su `HullZone` |

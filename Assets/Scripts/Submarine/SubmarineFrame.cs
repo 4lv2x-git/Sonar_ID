@@ -45,6 +45,21 @@ namespace SonarCrew.Submarine
             return proxy != null ? proxy.transform.TransformPoint(submarinePoint) : submarinePoint;
         }
 
+        /// <summary>
+        /// Punto del mundo físico → coordenada de mapa. Helper interno del marco para
+        /// los sistemas del submarino; no forma parte de ISubmarinePose.
+        /// </summary>
+        public Vector3 WorldToMap(Vector3 worldPoint)
+        {
+            return proxy != null ? MapPosition + (worldPoint - proxy.transform.position) : worldPoint;
+        }
+
+        /// <summary>Coordenada de mapa → punto del mundo físico. Inversa de WorldToMap.</summary>
+        public Vector3 MapToWorld(Vector3 mapPoint)
+        {
+            return proxy != null ? proxy.transform.position + (mapPoint - MapPosition) : mapPoint;
+        }
+
         private float RebaseDistance => config != null ? Mathf.Max(1f, config.RebaseDistance) : 2000f;
 
         private void Awake()
